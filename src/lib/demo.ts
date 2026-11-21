@@ -1,0 +1,148 @@
+import type { DateTime } from "luxon";
+import { alsDatum, plusDagen } from "./datum";
+import { voorvallen } from "./herhaling";
+import { SJABLONEN } from "./sjablonen";
+import { StaatSchema, type Afspraak, type Staat, type Taak, type Voltooiing } from "./types";
+
+/** Een voorbeeldgezin met een paar weken geschiedenis, om de app te kunnen proberen. */
+export function demoStaat(nu: DateTime): Staat {
+  const vandaag = alsDatum(nu);
+  const start = plusDagen(vandaag, -35);
+  const leden = [
+    { id: "anna", naam: "Anna", rol: "ouder" as const, kleur: "#db2777" },
+    { id: "bram", naam: "Bram", rol: "ouder" as const, kleur: "#2563eb" },
+    { id: "fien", naam: "Fien", rol: "kind" as const, kleur: "#16a34a", geboortejaar: nu.year - 7 },
+    { id: "sem", naam: "Sem", rol: "kind" as const, kleur: "#ea580c", geboortejaar: nu.year - 4 },
+  ];
+  // Een herkenbaar patroon: uitvoeren is redelijk verdeeld, het denkwerk ligt vooral bij Anna.
+  const eigenaarVan: Record<string, string | null> = {
+    "Weekmenu bedenken": "anna",
+    "Boodschappenlijst bijhouden": "anna",
+    "Boodschappen doen": "bram",
+    Koken: "anna",
+    "Lunch en tussendoortjes kinderen klaarmaken": "anna",
+    "Vaatwasser in- en uitruimen": "bram",
+    "Was draaien en ophangen": "anna",
+    "Was vouwen en opruimen": "anna",
+    "Bedden verschonen": "anna",
+    "Badkamer en wc schoonmaken": "bram",
+    Stofzuigen: "bram",
+    "Afval en papier buiten zetten": "bram",
+    "Kinderen naar bed brengen": "anna",
+    "Ochtendritme kinderen (aankleden, tassen)": "anna",
+    "Kleding en schoenen kinderen nalopen (te klein?)": "anna",
+    "Speelafspraken regelen": "anna",
+    "Verjaardagspartijtjes: cadeau en vervoer": "anna",
+    "Berichten van school en opvang lezen": "anna",
+    "Gymtas en zwemspullen klaarzetten": "anna",
+    "Vakanties en studiedagen: opvang plannen": "anna",
+    "Tandarts en controles plannen": "anna",
+    "Rekeningen en post afhandelen": "bram",
+    "Verjaardagen familie en vrienden: kaart of cadeau": "anna",
+    "Weekend plannen (uitjes, bezoek)": null,
+  };
+  const uitvoerderVan: Record<string, string> = {
+    Koken: "bram",
+    "Kinderen naar bed brengen": "bram",
+    "Was draaien en ophangen": "bram",
+    "Gymtas en zwemspullen klaarzetten": "fien",
+  };
+  const op = `${start}T09:00:00.000+01:00`;
+  const taken: Taak[] = SJABLONEN.filter((s) => s.standaard).map((s, i) => ({
+    id: `t${i}`,
+    titel: s.titel,
+    categorie: s.categorie,
+    notitie: s.denkwerkUitleg ?? "",
+    start,
+    herhaling: s.herhaling,
+    duurMin: s.duurMin,
+    denkwerk: s.denkwerk,
+    eigenaar: eigenaarVan[s.titel] ?? null,
+    uitvoerder: uitvoerderVan[s.titel] ?? null,
+    voor: s.categorie === "kinderen" || s.categorie === "school" ? ["fien", "sem"] : [],
+    inAgenda: false,
+    aangemaaktDoor: "anna",
+    aangemaaktOp: op,
+    gearchiveerd: false,
+  }));
+  taken.push({
+    id: "los1",
+    titel: "Winterjassen kopen",
+    categorie: "kinderen",
+    notitie: "Fien maat 128, Sem maat 110",
+    start: plusDagen(vandaag, 2),
+    herhaling: { soort: "geen", interval: 1, dagen: [] },
+    duurMin: 90,
+    denkwerk: 3,
+    eigenaar: "anna",
+    uitvoerder: "bram",
+    voor: ["fien", "sem"],
+    inAgenda: true,
+    aangemaaktDoor: "anna",
+    aangemaaktOp: `${plusDagen(vandaag, -6)}T20:15:00.000+01:00`,
+    gearchiveerd: false,
+  });
+
+  // Geschiedenis: een vaste pseudo-willekeur, zodat de demo elke keer hetzelfde is.
+  let zaad = 7;
+  const kans = () => ((zaad = (zaad * 16807) % 2147483647) / 2147483647);
+  const voltooiingen: Voltooiing[] = [];
+  for (const t of taken) {
+    for (const datum of voorvallen(t.start, t.herhaling, start, plusDagen(vandaag, -1))) {
+      const r = kans();
+      if (r < 0.12) continue; // bleef liggen
+      const uitvoerder = t.uitvoerder ?? t.eigenaar ?? (r < 0.5 ? "anna" : "bram");
+      // Soms neemt de ander het over.
+      const door = r > 0.9 ? (uitvoerder === "anna" ? "bram" : "anna") : uitvoerder;
+      voltooiingen.push({
+        id: `v${voltooiingen.length}`,
+        taakId: t.id,
+        datum,
+        status: r < 0.15 ? "overgeslagen" : "gedaan",
+        gedaanDoor: r < 0.15 ? null : door,
+        eigenaar: t.eigenaar,
+        denkwerk: t.denkwerk,
+        duurMin: r < 0.15 ? 0 : t.duurMin,
+        op: `${datum}T19:00:00.000+01:00`,
+      });
+    }
+  }
+
+  const afspraak = (a: Partial<Afspraak> & Pick<Afspraak, "id" | "titel" | "datum" | "leden">): Afspraak => ({
+    heleDag: false,
+    regelaar: null,
+    locatie: "",
+    notitie: "",
+    herhaling: { soort: "geen", interval: 1, dagen: [] },
+    aangemaaktDoor: "anna",
+    aangemaaktOp: op,
+    ...a,
+  });
+  const maandag = alsDatum(nu.startOf("week").minus({ weeks: 5 }));
+  const afspraken: Afspraak[] = [
+    afspraak({ id: "a1", titel: "Zwemles", datum: plusDagen(maandag, 2), begin: "15:30", eind: "16:15", leden: ["fien"], regelaar: "anna", locatie: "Zwembad", herhaling: { soort: "wekelijks", interval: 1, dagen: [3] } }),
+    afspraak({ id: "a2", titel: "Voetbal", datum: plusDagen(maandag, 5), begin: "09:00", eind: "10:00", leden: ["sem"], regelaar: "bram", herhaling: { soort: "wekelijks", interval: 1, dagen: [6] } }),
+    afspraak({ id: "a3", titel: "Tandarts", datum: plusDagen(vandaag, 4), begin: "08:30", eind: "09:00", leden: ["fien", "sem"], regelaar: "anna" }),
+    afspraak({ id: "a4", titel: "Studiedag school", datum: plusDagen(vandaag, 9), heleDag: true, leden: ["fien"], regelaar: "bram" }),
+    afspraak({ id: "a5", titel: "Etentje met vrienden", datum: plusDagen(vandaag, 6), begin: "19:00", eind: "22:30", leden: ["anna", "bram"], aangemaaktDoor: "bram" }),
+  ];
+
+  return StaatSchema.parse({
+    versie: 0,
+    gezinsnaam: "Gezin De Boer",
+    leden,
+    taken,
+    voltooiingen,
+    afspraken,
+    agendas: [],
+    opgemerkt: [
+      { id: "o1", tekst: "Sem heeft bijna geen luiers meer voor de nacht", door: "anna", op: `${plusDagen(vandaag, -2)}T21:00:00.000+01:00`, afgehandeld: false },
+      { id: "o2", tekst: "Cadeau voor oma's verjaardag (14 december)", door: "anna", op: `${plusDagen(vandaag, -9)}T21:00:00.000+01:00`, afgehandeld: false },
+      { id: "o3", tekst: "Fietsband Fien zacht", door: "bram", op: `${plusDagen(vandaag, -4)}T08:00:00.000+01:00`, afgehandeld: true },
+    ],
+    inschattingen: [{ door: "bram", ronde: 1, denkwerk: 45, uitvoeren: 50, op: `${plusDagen(vandaag, -1)}T21:00:00.000+01:00` }],
+    gesprekken: [],
+    ronde: 1,
+    feedSleutel: "demo",
+  });
+}

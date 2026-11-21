@@ -1,0 +1,313 @@
+import { z } from "zod";
+import {
+  AfspraakSchema,
+  CategorieSchema,
+  Datum,
+  DenkwerkSchema,
+  ExterneAgendaSchema,
+  HerhalingSchema,
+  Id,
+  KLEUREN,
+  Klok,
+  LidSchema,
+  TaakSchema,
+  type Staat,
+} from "./types";
+
+const NieuwLid = LidSchema.omit({ id: true, kleur: true }).extend({
+  id: Id.optional(),
+  kleur: LidSchema.shape.kleur.optional(),
+});
+
+const TaakInvoer = z.object({
+  id: Id.optional(),
+  titel: TaakSchema.shape.titel,
+  categorie: CategorieSchema,
+  notitie: z.string().max(2000).default(""),
+  start: Datum,
+  tijd: Klok.optional(),
+  herhaling: HerhalingSchema,
+  duurMin: TaakSchema.shape.duurMin,
+  denkwerk: DenkwerkSchema,
+  eigenaar: Id.nullable(),
+  uitvoerder: Id.nullable().default(null),
+  voor: z.array(Id).default([]),
+  inAgenda: z.boolean().default(false),
+});
+export type TaakInvoer = z.input<typeof TaakInvoer>;
+
+const AfspraakInvoer = AfspraakSchema.omit({ id: true, aangemaaktDoor: true, aangemaaktOp: true }).extend({
+  id: Id.optional(),
+});
+export type AfspraakInvoer = z.input<typeof AfspraakInvoer>;
+
+export const ActieSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("gezin.instellen"),
+    gezinsnaam: z.string().trim().max(60),
+    leden: z.array(NieuwLid).min(1).max(12),
+    taken: z.array(TaakInvoer).max(100).default([]),
+  }),
+  z.object({ type: z.literal("gezin.naam"), gezinsnaam: z.string().trim().max(60) }),
+  z.object({ type: z.literal("lid.opslaan"), lid: NieuwLid }),
+  z.object({ type: z.literal("lid.verwijderen"), id: Id }),
+  z.object({ type: z.literal("taak.opslaan"), taak: TaakInvoer }),
+  z.object({ type: z.literal("taken.toevoegen"), taken: z.array(TaakInvoer).min(1).max(100) }),
+  z.object({ type: z.literal("taak.verwijderen"), id: Id }),
+  z.object({
+    type: z.literal("taak.afvinken"),
+    taakId: Id,
+    datum: Datum,
+    gedaanDoor: Id.optional(),
+    duurMin: z.number().int().min(0).max(24 * 60).optional(),
+  }),
+  z.object({ type: z.literal("taak.overslaan"), taakId: Id, datum: Datum }),
+  z.object({ type: z.literal("taak.ongedaan"), taakId: Id, datum: Datum }),
+  z.object({
+    type: z.literal("taak.overdragen"),
+    taakId: Id,
+    naar: Id.nullable(),
+    /** true: het hele pakket (denkwerk én uitvoeren). false: alleen het denkwerk. */
+    heelPakket: z.boolean().default(true),
+  }),
+  z.object({ type: z.literal("afspraak.opslaan"), afspraak: AfspraakInvoer }),
+  z.object({ type: z.literal("afspraak.verwijderen"), id: Id }),
+  z.object({
+    type: z.literal("agenda.opslaan"),
+    // Een leeg adres bij een bestaande agenda: het oude adres houden.
+    agenda: ExterneAgendaSchema.omit({ id: true }).extend({ id: Id.optional(), url: z.string().trim().max(2000) }),
+  }),
+  z.object({ type: z.literal("agenda.verwijderen"), id: Id }),
+  z.object({ type: z.literal("opgemerkt.toevoegen"), tekst: z.string().trim().min(1).max(500) }),
+  z.object({ type: z.literal("opgemerkt.afhandelen"), id: Id, taakId: Id.optional() }),
+  z.object({ type: z.literal("opgemerkt.verwijderen"), id: Id }),
+  z.object({
+    type: z.literal("inschatting.opslaan"),
+    denkwerk: z.number().int().min(0).max(100),
+    uitvoeren: z.number().int().min(0).max(100),
+  }),
+  z.object({ type: z.literal("gesprek.opslaan"), datum: Datum, afspraken: z.string().max(4000) }),
+  z.object({ type: z.literal("feed.vernieuwen") }),
+]);
+export type Actie = z.input<typeof ActieSchema>;
+
+export interface Context {
+  /** Het gezinslid dat de actie doet. */
+  door: string;
+  /** Nu, als ISO-tekst. */
+  nu: string;
+  nieuwId: () => string;
+  nieuweSleutel: () => string;
+}
+
+export class ActieFout extends Error {}
+
+function vind<T extends { id: string }>(lijst: T[], id: string, wat: string): T {
+  const x = lijst.find((i) => i.id === id);
+  if (!x) throw new ActieFout(`${wat} niet gevonden`);
+  return x;
+}
+
+function controleerLid(staat: Staat, id: string | null | undefined, ouder = false) {
+  if (id == null) return;
+  const lid = staat.leden.find((l) => l.id === id);
+  if (!lid) throw new ActieFout("Onbekend gezinslid");
+  if (ouder && lid.rol !== "ouder") throw new ActieFout(`${lid.naam} is geen ouder`);
+}
+
+function bouwTaak(staat: Staat, invoer: z.output<typeof TaakInvoer>, ctx: Context) {
+  controleerLid(staat, invoer.eigenaar, true);
+  controleerLid(staat, invoer.uitvoerder);
+  invoer.voor.forEach((v) => controleerLid(staat, v));
+  const bestaand = invoer.id ? staat.taken.find((t) => t.id === invoer.id) : undefined;
+  return TaakSchema.parse({
+    ...invoer,
+    id: bestaand?.id ?? invoer.id ?? ctx.nieuwId(),
+    aangemaaktDoor: bestaand?.aangemaaktDoor ?? ctx.door,
+    aangemaaktOp: bestaand?.aangemaaktOp ?? ctx.nu,
+    gearchiveerd: false,
+  });
+}
+
+/**
+ * Past één actie toe en geeft een nieuwe staat terug (de oude blijft ongewijzigd).
+ * Gooit een ActieFout bij ongeldige invoer.
+ */
+export function pasToe(oud: Staat, ruweActie: unknown, ctx: Context): Staat {
+  const actie = ActieSchema.parse(ruweActie);
+  const staat: Staat = structuredClone(oud);
+  if (!staat.feedSleutel) staat.feedSleutel = ctx.nieuweSleutel();
+
+  if (actie.type !== "gezin.instellen") {
+    if (staat.leden.length === 0) throw new ActieFout("Stel eerst het gezin in");
+    controleerLid(staat, ctx.door, true);
+  }
+
+  switch (actie.type) {
+    case "gezin.instellen": {
+      if (staat.leden.length > 0) throw new ActieFout("Het gezin is al ingesteld");
+      staat.gezinsnaam = actie.gezinsnaam;
+      staat.leden = actie.leden.map((l, i) =>
+        LidSchema.parse({ ...l, id: l.id ?? ctx.nieuwId(), kleur: l.kleur ?? KLEUREN[i % KLEUREN.length] }),
+      );
+      if (!staat.leden.some((l) => l.rol === "ouder")) throw new ActieFout("Er moet minstens één ouder zijn");
+      const door = staat.leden.find((l) => l.id === ctx.door)?.id ?? staat.leden.find((l) => l.rol === "ouder")!.id;
+      for (const t of actie.taken) staat.taken.push(bouwTaak(staat, t, { ...ctx, door }));
+      break;
+    }
+    case "gezin.naam":
+      staat.gezinsnaam = actie.gezinsnaam;
+      break;
+    case "lid.opslaan": {
+      const bestaand = actie.lid.id ? staat.leden.find((l) => l.id === actie.lid.id) : undefined;
+      if (bestaand) {
+        if (bestaand.rol === "ouder" && actie.lid.rol === "kind") {
+          const inGebruik = staat.taken.some((t) => t.eigenaar === bestaand.id);
+          if (inGebruik) throw new ActieFout("Draag eerst de taken van deze ouder over");
+        }
+        Object.assign(bestaand, LidSchema.parse({ ...bestaand, ...actie.lid, kleur: actie.lid.kleur ?? bestaand.kleur }));
+      } else {
+        staat.leden.push(
+          LidSchema.parse({
+            ...actie.lid,
+            id: ctx.nieuwId(),
+            kleur: actie.lid.kleur ?? KLEUREN[staat.leden.length % KLEUREN.length],
+          }),
+        );
+      }
+      if (!staat.leden.some((l) => l.rol === "ouder")) throw new ActieFout("Er moet minstens één ouder zijn");
+      break;
+    }
+    case "lid.verwijderen": {
+      vind(staat.leden, actie.id, "Gezinslid");
+      if (actie.id === ctx.door) throw new ActieFout("Je kunt jezelf niet verwijderen");
+      const inGebruik =
+        staat.taken.some((t) => !t.gearchiveerd && (t.eigenaar === actie.id || t.uitvoerder === actie.id || t.voor.includes(actie.id))) ||
+        staat.afspraken.some((a) => a.leden.includes(actie.id) || a.regelaar === actie.id) ||
+        staat.agendas.some((a) => a.lid === actie.id);
+      if (inGebruik) throw new ActieFout("Dit gezinslid hangt nog aan taken, afspraken of agenda's");
+      staat.leden = staat.leden.filter((l) => l.id !== actie.id);
+      break;
+    }
+    case "taak.opslaan": {
+      const taak = bouwTaak(staat, actie.taak, ctx);
+      const i = staat.taken.findIndex((t) => t.id === taak.id);
+      if (i >= 0) staat.taken[i] = taak;
+      else staat.taken.push(taak);
+      break;
+    }
+    case "taken.toevoegen":
+      for (const t of actie.taken) staat.taken.push(bouwTaak(staat, { ...t, id: undefined }, ctx));
+      break;
+    case "taak.verwijderen": {
+      const taak = vind(staat.taken, actie.id, "Taak");
+      // Met geschiedenis: archiveren, zodat de inzichten kloppen.
+      if (staat.voltooiingen.some((v) => v.taakId === taak.id)) taak.gearchiveerd = true;
+      else staat.taken = staat.taken.filter((t) => t.id !== taak.id);
+      break;
+    }
+    case "taak.afvinken":
+    case "taak.overslaan": {
+      const taak = vind(staat.taken, actie.taakId, "Taak");
+      const gedaanDoor = actie.type === "taak.afvinken" ? (actie.gedaanDoor ?? ctx.door) : null;
+      controleerLid(staat, gedaanDoor);
+      staat.voltooiingen = staat.voltooiingen.filter((v) => !(v.taakId === taak.id && v.datum === actie.datum));
+      staat.voltooiingen.push({
+        id: ctx.nieuwId(),
+        taakId: taak.id,
+        datum: actie.datum,
+        status: actie.type === "taak.afvinken" ? "gedaan" : "overgeslagen",
+        gedaanDoor,
+        eigenaar: taak.eigenaar,
+        denkwerk: taak.denkwerk,
+        duurMin: actie.type === "taak.afvinken" ? (actie.duurMin ?? taak.duurMin) : 0,
+        op: ctx.nu,
+      });
+      break;
+    }
+    case "taak.ongedaan":
+      staat.voltooiingen = staat.voltooiingen.filter((v) => !(v.taakId === actie.taakId && v.datum === actie.datum));
+      break;
+    case "taak.overdragen": {
+      const taak = vind(staat.taken, actie.taakId, "Taak");
+      controleerLid(staat, actie.naar, true);
+      taak.eigenaar = actie.naar;
+      if (actie.heelPakket) taak.uitvoerder = null;
+      break;
+    }
+    case "afspraak.opslaan": {
+      const a = actie.afspraak;
+      a.leden.forEach((l) => controleerLid(staat, l));
+      controleerLid(staat, a.regelaar, true);
+      const bestaand = a.id ? staat.afspraken.find((x) => x.id === a.id) : undefined;
+      const afspraak = AfspraakSchema.parse({
+        ...a,
+        id: bestaand?.id ?? ctx.nieuwId(),
+        aangemaaktDoor: bestaand?.aangemaaktDoor ?? ctx.door,
+        aangemaaktOp: bestaand?.aangemaaktOp ?? ctx.nu,
+      });
+      if (!afspraak.heleDag && !afspraak.begin) throw new ActieFout("Kies een begintijd of 'hele dag'");
+      if (afspraak.begin && afspraak.eind && afspraak.eind <= afspraak.begin) {
+        throw new ActieFout("De eindtijd moet na de begintijd liggen");
+      }
+      const i = staat.afspraken.findIndex((x) => x.id === afspraak.id);
+      if (i >= 0) staat.afspraken[i] = afspraak;
+      else staat.afspraken.push(afspraak);
+      break;
+    }
+    case "afspraak.verwijderen":
+      vind(staat.afspraken, actie.id, "Afspraak");
+      staat.afspraken = staat.afspraken.filter((a) => a.id !== actie.id);
+      break;
+    case "agenda.opslaan": {
+      const g = actie.agenda;
+      controleerLid(staat, g.lid);
+      const bestaand = g.id ? staat.agendas.find((x) => x.id === g.id) : undefined;
+      const url = (g.url || bestaand?.url || "").trim().replace(/^webcal:\/\//i, "https://");
+      if (!/^https:\/\/[^\s/]+\.[^\s]+$/i.test(url)) {
+        throw new ActieFout("Gebruik een iCal-adres dat begint met https:// of webcal://");
+      }
+      const agenda = ExterneAgendaSchema.parse({ ...g, url, id: bestaand?.id ?? ctx.nieuwId() });
+      if (bestaand) Object.assign(bestaand, agenda);
+      else staat.agendas.push(agenda);
+      break;
+    }
+    case "agenda.verwijderen":
+      vind(staat.agendas, actie.id, "Agenda");
+      staat.agendas = staat.agendas.filter((a) => a.id !== actie.id);
+      break;
+    case "opgemerkt.toevoegen":
+      staat.opgemerkt.push({ id: ctx.nieuwId(), tekst: actie.tekst, door: ctx.door, op: ctx.nu, afgehandeld: false });
+      break;
+    case "opgemerkt.afhandelen": {
+      const o = vind(staat.opgemerkt, actie.id, "Notitie");
+      o.afgehandeld = true;
+      if (actie.taakId) o.taakId = actie.taakId;
+      break;
+    }
+    case "opgemerkt.verwijderen":
+      vind(staat.opgemerkt, actie.id, "Notitie");
+      staat.opgemerkt = staat.opgemerkt.filter((o) => o.id !== actie.id);
+      break;
+    case "inschatting.opslaan":
+      staat.inschattingen = staat.inschattingen.filter((i) => !(i.door === ctx.door && i.ronde === staat.ronde));
+      staat.inschattingen.push({
+        door: ctx.door,
+        ronde: staat.ronde,
+        denkwerk: actie.denkwerk,
+        uitvoeren: actie.uitvoeren,
+        op: ctx.nu,
+      });
+      break;
+    case "gesprek.opslaan":
+      staat.gesprekken.push({ id: ctx.nieuwId(), ronde: staat.ronde, datum: actie.datum, afspraken: actie.afspraken, op: ctx.nu });
+      staat.ronde += 1;
+      break;
+    case "feed.vernieuwen":
+      staat.feedSleutel = ctx.nieuweSleutel();
+      break;
+  }
+
+  staat.versie = oud.versie + 1;
+  return staat;
+}
