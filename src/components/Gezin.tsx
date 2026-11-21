@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { KLEUREN, REGIOS, type ExterneAgenda, type Lid, type Regio } from "@/lib/types";
+import { codeVan } from "@/lib/leden";
 import { post, useGezin } from "./context";
 import { Meldingen } from "./Meldingen";
 import { Blad, Bolletje, Keuzes } from "./ui";
@@ -16,7 +17,7 @@ function LidBlad({ lid, sluit }: { lid?: Lid; sluit: () => void }) {
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          if (await doe({ type: "lid.opslaan", lid: { id: lid?.id, naam: l.naam ?? "", rol: l.rol ?? "kind", kleur: l.kleur, geboortejaar: l.geboortejaar } })) sluit();
+          if (await doe({ type: "lid.opslaan", lid: { id: lid?.id, naam: l.naam ?? "", rol: l.rol ?? "kind", kleur: l.kleur, geboortejaar: l.geboortejaar, code: l.code ?? "" } })) sluit();
         }}
       >
         <label className="veld">
@@ -47,6 +48,21 @@ function LidBlad({ lid, sluit }: { lid?: Lid; sluit: () => void }) {
             />
           </label>
         )}
+        <label className="veld">
+          <span>Letter in de agenda (optioneel)</span>
+          <input
+            type="text"
+            maxLength={3}
+            value={l.code ?? ""}
+            placeholder={(l.naam ?? "").trim().charAt(0).toUpperCase() || "S"}
+            onChange={(e) => zet({ ...l, code: e.target.value.toUpperCase().replace(/[^A-ZÀ-Ý]/g, "") || undefined })}
+            style={{ width: 90 }}
+          />
+          <span className="stil klein" style={{ display: "block", marginTop: 4 }}>
+            Zo herkent de app &quot;{(l.code || (l.naam ?? "").trim().charAt(0).toUpperCase() || "S")} judo&quot; in een agenda of de invoerregel
+            als een afspraak van {l.naam || "dit gezinslid"}. Leeg = de eerste letter van de naam.
+          </span>
+        </label>
         <div className="veld" style={{ marginBottom: 12 }}>
           <span className="veld-label">Kleur</span>
           <div className="keuzes">
@@ -232,7 +248,7 @@ function AgendaBlad({ agenda, sluit }: { agenda?: ExterneAgenda; sluit: () => vo
   const [a, zet] = useState({
     naam: agenda?.naam ?? "",
     url: "",
-    lid: agenda?.lid ?? ik ?? staat.leden[0].id,
+    lid: (agenda ? agenda.lid : (ik ?? staat.leden[0].id)) as string | null,
     alleenBezet: agenda?.alleenBezet ?? false,
   });
   return (
@@ -278,13 +294,20 @@ function AgendaBlad({ agenda, sluit }: { agenda?: ExterneAgenda; sluit: () => vo
         </details>
         <label className="veld" style={{ marginTop: 10 }}>
           <span>Van wie is deze agenda?</span>
-          <select value={a.lid} onChange={(e) => zet({ ...a, lid: e.target.value })}>
+          <select value={a.lid ?? ""} onChange={(e) => zet({ ...a, lid: e.target.value || null })}>
+            <option value="">Het hele gezin (bijvoorbeeld jullie gezamenlijke agenda)</option>
             {staat.leden.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.naam}
               </option>
             ))}
           </select>
+          {a.lid === null && (
+            <span className="stil klein" style={{ display: "block", marginTop: 4 }}>
+              Afspraken komen bij wie in de titel staat: een naam (&quot;Zwemles Stijn&quot;) of letters vooraan (&quot;S judo&quot;, &quot;S+T
+              zwemmen&quot;). Zonder naam of letter komen ze bij jullie als ouders. De letters stel je per gezinslid in.
+            </span>
+          )}
         </label>
         <label className="vink">
           <input type="checkbox" checked={a.alleenBezet} onChange={(e) => zet({ ...a, alleenBezet: e.target.checked })} />
@@ -351,6 +374,7 @@ export function Gezin() {
                 </div>
                 <div className="meta">
                   {l.rol === "ouder" ? "Ouder" : "Kind"}
+                  {codeVan(l, staat.leden) ? ` · letter ${codeVan(l, staat.leden)}` : ""}
                   {l.geboortejaar ? ` · ${new Date().getFullYear() - l.geboortejaar} jaar` : ""}
                 </div>
               </button>
@@ -371,11 +395,11 @@ export function Gezin() {
           <ul className="lijst">
             {staat.agendas.map((a) => (
               <li key={a.id}>
-                <Bolletje lid={lid(a.lid)} klein />
+                {a.lid ? <Bolletje lid={lid(a.lid)} klein /> : <span className="bol klein" style={{ background: "var(--accent)" }}>⌂</span>}
                 <button className="regel" onClick={() => zetBewerkAgenda(a)}>
                   <div className="titel">{a.naam}</div>
                   <div className="meta">
-                    {a.url} {a.alleenBezet ? "· alleen bezet" : ""}
+                    {a.lid ? lid(a.lid)?.naam : "Hele gezin"} · {a.url} {a.alleenBezet ? "· alleen bezet" : ""}
                   </div>
                 </button>
               </li>

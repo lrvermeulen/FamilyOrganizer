@@ -1,6 +1,7 @@
 import { DateTime } from "luxon";
 import { splitsBoodschappen } from "./boodschappen";
 import { alsDatum, dag } from "./datum";
+import { herkenLeden } from "./leden";
 import type { Lid } from "./types";
 
 /**
@@ -154,9 +155,7 @@ export function vindDatum(tekst: string, vandaag: string): Gevonden {
 }
 
 function vindLeden(tekst: string, leden: Lid[]): string[] {
-  return leden
-    .filter((l) => new RegExp(`(^|[^\\p{L}])${l.naam.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}('s|s)?(?![\\p{L}])`, "iu").test(tekst))
-    .map((l) => l.id);
+  return herkenLeden(tekst, leden).leden;
 }
 
 function maakTitel(tekst: string, weg: string[]): string {
@@ -211,11 +210,12 @@ export function leesRegel(regel: string, opties: { vandaag: string; leden: Lid[]
   const d = vindDatum(bron, opties.vandaag);
   const t = vindTijden(bron);
   const uiterlijk = UITERLIJK_RE.test(bron);
-  const leden = vindLeden(bron, opties.leden);
+  const herkend = herkenLeden(bron, opties.leden);
+  const leden = herkend.leden;
   const soort: Voorstel["soort"] = uiterlijk ? "taak" : t.begin ? "afspraak" : d.datum && HELE_DAG_RE.test(bron) ? "afspraak" : d.datum ? "taak" : "taak";
   return {
     soort,
-    titel: maakTitel(bron, [...d.stukken, ...t.stukken]) || bron.slice(0, 80),
+    titel: maakTitel(herkend.titel, [...d.stukken, ...t.stukken]) || bron.slice(0, 80),
     datum: d.datum ?? opties.vandaag,
     heleDag: !t.begin,
     begin: t.begin,

@@ -8,7 +8,7 @@ export async function haalExtern(staat: Staat, van: string, tot: string): Promis
   const lijsten = await Promise.all(
     staat.agendas.map(async (a): Promise<AgendaItem[]> => {
       try {
-        return leesIcs(await haalIcs(a.url), a, van, tot);
+        return leesIcs(await haalIcs(a.url), a, van, tot, staat.leden);
       } catch (e) {
         fouten.push({ agenda: a.naam, fout: e instanceof Error ? e.message : "Onbekende fout" });
         return [];

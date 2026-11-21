@@ -2,7 +2,8 @@ import ICAL from "ical.js";
 import { DateTime } from "luxon";
 import type { AgendaItem } from "../agenda";
 import { alsDatum, TIJDZONE } from "../datum";
-import type { ExterneAgenda } from "../types";
+import { herkenLeden } from "../leden";
+import type { ExterneAgenda, Lid } from "../types";
 
 const MAX_VOORVALLEN = 2000;
 const MAX_DAGEN_PER_ITEM = 31;
@@ -32,7 +33,17 @@ function moment(t: ICAL.Time): Moment {
  * Leest een iCal-bestand (bijvoorbeeld het geheime iCal-adres van Google Agenda of een gedeelde
  * iCloud-agenda) en geeft de items binnen [van, tot], met herhalingen uitgeschreven.
  */
-export function leesIcs(tekst: string, agenda: ExterneAgenda, van: string, tot: string): AgendaItem[] {
+export function leesIcs(tekst: string, agenda: ExterneAgenda, van: string, tot: string, leden: Lid[] = []): AgendaItem[] {
+  const ouders = leden.filter((l) => l.rol === "ouder").map((l) => l.id);
+  /**
+   * Voor wie is een afspraak? Namen of letters in de titel ("S judo") gaan voor.
+   * Anders: de eigenaar van de agenda, of bij een gezinsagenda de ouders.
+   */
+  const voorWie = (titel: string) => {
+    if (agenda.alleenBezet) return { leden: agenda.lid ? [agenda.lid] : ouders, titel: "Bezet" };
+    const h = herkenLeden(titel, leden);
+    return { leden: h.leden.length ? h.leden : agenda.lid ? [agenda.lid] : ouders, titel: h.titel || titel };
+  };
   const jcal = ICAL.parse(tekst);
   const kalender = new ICAL.Component(jcal);
   for (const tz of kalender.getAllSubcomponents("vtimezone")) {
@@ -60,7 +71,8 @@ export function leesIcs(tekst: string, agenda: ExterneAgenda, van: string, tot: 
     if (e < vanaf || s > totEnMet) return;
     const heleDag = start.isDate;
     const begin = moment(start);
-    const titel = agenda.alleenBezet ? "Bezet" : ev.summary || "(zonder titel)";
+    const wie = voorWie(ev.summary || "(zonder titel)");
+    const titel = wie.titel;
     // Een afspraak over meerdere dagen komt op elke dag (een hele dag: tot de einddatum, exclusief).
     const laatsteDag = heleDag ? e.minus({ days: 1 }) : e.minus({ milliseconds: 1 });
     let dagen = Math.max(0, Math.floor(laatsteDag.startOf("day").diff(s.startOf("day"), "days").days));
@@ -80,7 +92,7 @@ export function leesIcs(tekst: string, agenda: ExterneAgenda, van: string, tot: 
         heleDag: heleDag || (meerdaags && !eersteDag && !laatste),
         begin: heleDag ? undefined : eersteDag ? begin.klok : meerdaags && !laatste ? undefined : "00:00",
         eind: heleDag ? undefined : laatste ? e.toFormat("HH:mm") : "23:59",
-        leden: [agenda.lid],
+        leden: wie.leden,
         locatie: agenda.alleenBezet ? undefined : ev.location || undefined,
         refId: agenda.id,
         bron: agenda.naam,
