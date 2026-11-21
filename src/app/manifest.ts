@@ -11,5 +11,7 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#0f766e",
     lang: "nl",
     icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }],
-  };
+    // Android: "Delen" vanuit WhatsApp of een andere app zet de tekst in de inbox.
+    share_target: { action: "/api/delen", method: "GET", params: { title: "title", text: "text", url: "url" } },
+  } as MetadataRoute.Manifest;
 }

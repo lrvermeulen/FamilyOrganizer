@@ -32,8 +32,9 @@ export type Categorie = keyof typeof CATEGORIEEN;
 export const CategorieSchema = z.enum(Object.keys(CATEGORIEEN) as [Categorie, ...Categorie[]]);
 
 export const HerhalingSchema = z.object({
-  soort: z.enum(["geen", "dagelijks", "wekelijks", "maandelijks", "jaarlijks"]),
-  /** Elke N dagen, weken, maanden of jaren. */
+  /** "doorlopend": een verantwoordelijkheid zonder vaste momenten (interval = ongeveer zo vaak per week). */
+  soort: z.enum(["geen", "dagelijks", "wekelijks", "maandelijks", "jaarlijks", "doorlopend"]),
+  /** Elke N dagen, weken, maanden of jaren. Bij doorlopend: ongeveer N keer per week. */
   interval: z.number().int().min(1).max(52).default(1),
   /** Bij wekelijks: ISO-weekdagen (1 = maandag ... 7 = zondag). Leeg = de weekdag van de startdatum. */
   dagen: z.array(z.number().int().min(1).max(7)).max(7).default([]),
@@ -53,6 +54,17 @@ export const DENKWERK = {
   3: { naam: "Zwaar", uitleg: "Vooruitdenken, keuzes maken, afstemmen met anderen en bewaken" },
 } as const;
 export const DenkwerkSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
+
+/**
+ * Soort onzichtbaar werk. Denkwerk: bedenken, plannen, onthouden, bewaken.
+ * Emotioneel werk: aandacht en zorg, merken hoe het met iemand gaat, troosten, contact onderhouden.
+ */
+export const WERKSOORTEN = {
+  denkwerk: "Denkwerk",
+  emotioneel: "Emotioneel werk",
+} as const;
+export const WerksoortSchema = z.enum(["denkwerk", "emotioneel"]);
+export type Werksoort = z.infer<typeof WerksoortSchema>;
 export type Denkwerk = z.infer<typeof DenkwerkSchema>;
 
 export const TaakSchema = z.object({
@@ -68,6 +80,8 @@ export const TaakSchema = z.object({
   /** Geschatte tijd om de taak uit te voeren, in minuten. */
   duurMin: z.number().int().min(0).max(24 * 60),
   denkwerk: DenkwerkSchema,
+  /** Is het onzichtbare deel vooral denkwerk of emotioneel werk? */
+  werksoort: WerksoortSchema.default("denkwerk"),
   /** Wie houdt het in het hoofd: eraan denken, plannen, bewaken. null = nog niet verdeeld. */
   eigenaar: Id.nullable(),
   /** Wie voert het meestal uit. null = de eigenaar. */
@@ -106,8 +120,11 @@ export const AfspraakSchema = z.object({
   eind: Klok.optional(),
   /** Voor wie de afspraak is. */
   leden: z.array(Id).min(1),
-  /** Welke ouder het regelt (brengen, halen, erbij zijn). Telt mee in de inzichten. */
+  /** Welke ouder het regelt (eraan denken, afstemmen; zonder brengen/halen ook: erbij zijn). */
   regelaar: Id.nullable().default(null),
+  /** Wie brengt en wie haalt (een ouder, of bijvoorbeeld opa of oma buiten de app: null). */
+  brengt: Id.nullable().default(null),
+  haalt: Id.nullable().default(null),
   locatie: z.string().max(200).default(""),
   notitie: z.string().max(2000).default(""),
   herhaling: HerhalingSchema,
@@ -135,6 +152,8 @@ export const OpgemerktSchema = z.object({
   op: z.string(),
   afgehandeld: z.boolean().default(false),
   taakId: Id.optional(),
+  /** Hoe het binnenkwam: zelf getypt, geplakt bericht, screenshot of gedeeld vanaf de telefoon. */
+  bron: z.enum(["zelf", "plakken", "foto", "delen"]).default("zelf"),
 });
 export type Opgemerkt = z.infer<typeof OpgemerktSchema>;
 
@@ -144,6 +163,7 @@ export const InschattingSchema = z.object({
   ronde: z.number().int().min(1),
   denkwerk: z.number().int().min(0).max(100),
   uitvoeren: z.number().int().min(0).max(100),
+  emotioneel: z.number().int().min(0).max(100).optional(),
   op: z.string(),
 });
 export type Inschatting = z.infer<typeof InschattingSchema>;
@@ -157,6 +177,67 @@ export const GesprekSchema = z.object({
   op: z.string(),
 });
 export type Gesprek = z.infer<typeof GesprekSchema>;
+
+/** Wie het volgens een ouder in het hoofd heeft, per taak (kaartjesronde). */
+export const ANTWOORDEN = { ik: "Ik", ander: "De ander", samen: "Samen", weetniet: "Weet niet", nvt: "Niet relevant" } as const;
+export const PerceptieSchema = z.object({
+  door: Id,
+  ronde: z.number().int().min(1),
+  taakId: Id,
+  antwoord: z.enum(["ik", "ander", "samen", "weetniet", "nvt"]),
+});
+export type Perceptie = z.infer<typeof PerceptieSchema>;
+export type Antwoord = Perceptie["antwoord"];
+
+/** Wie brengt en haalt bij een afspraak uit een gekoppelde agenda (die zelf niet te wijzigen is). */
+export const ExternRegelingSchema = z.object({
+  /** agenda-id|uid|datum */
+  sleutel: z.string().max(600),
+  datum: Datum,
+  titel: z.string().max(200),
+  leden: z.array(Id).default([]),
+  brengt: Id.nullable().default(null),
+  haalt: Id.nullable().default(null),
+});
+export type ExternRegeling = z.infer<typeof ExternRegelingSchema>;
+
+/** Het avondeten van één dag. */
+export const MaaltijdSchema = z.object({
+  datum: Datum,
+  wat: z.string().trim().max(120),
+  kok: Id.nullable().default(null),
+  ingredienten: z.array(z.string().trim().min(1).max(80)).max(40).default([]),
+});
+export type Maaltijd = z.infer<typeof MaaltijdSchema>;
+
+export const BoodschapSchema = z.object({
+  id: Id,
+  naam: z.string().trim().min(1).max(80),
+  afdeling: z.string().max(40),
+  gekocht: z.boolean().default(false),
+  door: Id,
+  op: z.string(),
+  /** Voor welke maaltijd (datum), als hij van het menu komt. */
+  voor: Datum.optional(),
+});
+export type Boodschap = z.infer<typeof BoodschapSchema>;
+
+export const MeldingInstellingSchema = z.object({
+  lid: Id,
+  briefing: z.boolean().default(true),
+  briefingTijd: Klok.default("07:00"),
+  /** Zoveel minuten voor een afspraak (die je regelt, brengt of haalt) een herinnering. null = uit. */
+  herinneringMin: z.number().int().min(5).max(24 * 60).nullable().default(30),
+  /** 's Avonds een herinnering voor eigen taken die vandaag nog openstaan. */
+  takenAvond: z.boolean().default(true),
+  takenAvondTijd: Klok.default("19:30"),
+  /** Een melding als de ander iets afvinkt. */
+  afgevinkt: z.boolean().default(false),
+});
+export type MeldingInstelling = z.infer<typeof MeldingInstellingSchema>;
+
+export const REGIOS = { noord: "Noord", midden: "Midden", zuid: "Zuid" } as const;
+export type Regio = keyof typeof REGIOS;
 
 export const StaatSchema = z.object({
   versie: z.number().int().min(0),
@@ -173,6 +254,17 @@ export const StaatSchema = z.object({
   ronde: z.number().int().min(1).default(1),
   /** Geheim stukje van de adressen van de agenda-feeds. */
   feedSleutel: z.string().default(""),
+  /** Geheim stukje van het adres van de keukenstand. */
+  keukenSleutel: z.string().default(""),
+  /** Geheime code om vanaf de telefoon iets naar de inbox te sturen (Opdracht op de iPhone). */
+  inboxSleutel: z.string().default(""),
+  percepties: z.array(PerceptieSchema).default([]),
+  externRegelingen: z.array(ExternRegelingSchema).default([]),
+  maaltijden: z.array(MaaltijdSchema).default([]),
+  boodschappen: z.array(BoodschapSchema).default([]),
+  meldingen: z.array(MeldingInstellingSchema).default([]),
+  /** Regio voor de schoolvakanties; null = niet tonen. */
+  regio: z.enum(["noord", "midden", "zuid"]).nullable().default(null),
 });
 export type Staat = z.infer<typeof StaatSchema>;
 

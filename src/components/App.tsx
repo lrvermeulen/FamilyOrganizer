@@ -1,23 +1,27 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Agenda } from "./Agenda";
+import { Bord } from "./Bord";
 import { GezinProvider, useGezin, type Gegevens } from "./context";
-import { AfspraakFormulier, OpgemerktFormulier, TaakFormulier } from "./Formulieren";
+import { AfspraakFormulier, TaakFormulier } from "./Formulieren";
 import { Gezin } from "./Gezin";
+import { Inbox } from "./Inbox";
+import { Invoerregel } from "./Invoer";
 import { Inzicht } from "./Inzicht";
+import { Lijsten } from "./Lijsten";
 import { KiesWie, Login } from "./Login";
 import { Start } from "./Start";
-import { Taken } from "./Taken";
-import { Vandaag } from "./Vandaag";
+import { Blad } from "./ui";
 
 const TABS = [
-  { id: "vandaag", naam: "Vandaag", ico: "☀︎" },
-  { id: "agenda", naam: "Agenda", ico: "▦" },
-  { id: "taken", naam: "Taken", ico: "☑︎" },
+  { id: "bord", naam: "Bord", ico: "▦" },
+  { id: "inbox", naam: "Inbox", ico: "⇣" },
+  { id: "lijsten", naam: "Lijsten", ico: "☑︎" },
   { id: "inzicht", naam: "Inzicht", ico: "◐" },
   { id: "gezin", naam: "Gezin", ico: "⌂" },
 ];
+/** Oude adressen (#vandaag, #agenda, #taken) blijven werken. */
+const OUD: Record<string, string> = { vandaag: "bord", agenda: "bord", taken: "lijsten", boodschappen: "lijsten" };
 
 type Toestand = { soort: "laden" } | { soort: "login" } | { soort: "fout"; bericht: string } | { soort: "klaar"; gegevens: Gegevens };
 
@@ -73,9 +77,13 @@ export function App() {
 
 function Schil() {
   const { staat, modus, melding, meld } = useGezin();
-  const [tab, zetTab] = useState(() => (typeof window !== "undefined" && TABS.some((t) => `#${t.id}` === location.hash) ? location.hash.slice(1) : "vandaag"));
-  const [plus, zetPlus] = useState(false);
-  const [blad, zetBlad] = useState<null | { soort: "taak" } | { soort: "opgemerkt" } | { soort: "afspraak"; id?: string; datum?: string }>(null);
+  const [tab, zetTab] = useState(() => {
+    if (typeof window === "undefined") return "bord";
+    const h = location.hash.slice(1);
+    return TABS.some((t) => t.id === h) ? h : (OUD[h] ?? "bord");
+  });
+  const [blad, zetBlad] = useState<null | { soort: "snel" } | { soort: "taak" } | { soort: "afspraak"; id?: string; datum?: string }>(null);
+  const inbox = staat.opgemerkt.filter((o) => !o.afgehandeld).length;
 
   const naarTab = (t: string) => {
     zetTab(t);
@@ -94,34 +102,21 @@ function Schil() {
     <>
       {modus === "demo" && <div className="demo-balk">Demo met een voorbeeldgezin. Wijzigingen zijn alleen om te proberen.</div>}
       <main className="wrap">
-        {tab === "vandaag" && <Vandaag naarTab={naarTab} bewerkAfspraak={(id) => zetBlad({ soort: "afspraak", id })} />}
-        {tab === "agenda" && (
-          <Agenda
+        {tab === "bord" && (
+          <Bord
             naarTab={naarTab}
             nieuweAfspraak={(datum) => zetBlad({ soort: "afspraak", datum })}
             bewerkAfspraak={(id) => zetBlad({ soort: "afspraak", id })}
           />
         )}
-        {tab === "taken" && <Taken />}
+        {tab === "inbox" && <Inbox />}
+        {tab === "lijsten" && <Lijsten />}
         {tab === "inzicht" && <Inzicht naarTaken={() => naarTab("taken")} />}
         {tab === "gezin" && <Gezin />}
       </main>
 
-      {plus && (
-        <div className="plus-menu">
-          <button className="knop" onClick={() => (zetPlus(false), zetBlad({ soort: "opgemerkt" }))}>
-            💭 Opgemerkt
-          </button>
-          <button className="knop" onClick={() => (zetPlus(false), zetBlad({ soort: "taak" }))}>
-            ☑︎ Taak
-          </button>
-          <button className="knop" onClick={() => (zetPlus(false), zetBlad({ soort: "afspraak" }))}>
-            ▦ Afspraak
-          </button>
-        </div>
-      )}
-      <button className="plus" aria-label={plus ? "Sluiten" : "Toevoegen"} aria-expanded={plus} onClick={() => zetPlus(!plus)}>
-        {plus ? "×" : "+"}
+      <button className="plus" aria-label="Snel toevoegen" onClick={() => zetBlad({ soort: "snel" })}>
+        +
       </button>
 
       <div className="tabs">
@@ -130,6 +125,7 @@ function Schil() {
             <button key={t.id} aria-current={tab === t.id ? "page" : undefined} onClick={() => naarTab(t.id)}>
               <span className="ico" aria-hidden>
                 {t.ico}
+                {t.id === "inbox" && inbox > 0 && <i className="teller">{inbox}</i>}
               </span>
               {t.naam}
             </button>
@@ -146,8 +142,21 @@ function Schil() {
         </div>
       )}
 
+      {blad?.soort === "snel" && (
+        <Blad titel="Snel toevoegen" sluit={() => zetBlad(null)}>
+          <Invoerregel compact klaar={() => zetBlad(null)} />
+          <div className="rij" style={{ marginTop: 6 }}>
+            <span className="stil klein">Of uitgebreid:</span>
+            <button className="knop klein" onClick={() => zetBlad({ soort: "afspraak" })}>
+              Afspraak
+            </button>
+            <button className="knop klein" onClick={() => zetBlad({ soort: "taak" })}>
+              Taak
+            </button>
+          </div>
+        </Blad>
+      )}
       {blad?.soort === "taak" && <TaakFormulier sluit={() => zetBlad(null)} />}
-      {blad?.soort === "opgemerkt" && <OpgemerktFormulier sluit={() => zetBlad(null)} />}
       {blad?.soort === "afspraak" && <AfspraakFormulier afspraak={afspraak} datum={blad.datum} sluit={() => zetBlad(null)} />}
     </>
   );

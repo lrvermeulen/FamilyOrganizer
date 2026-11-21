@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { appItems, betreft, overlapt, sorteer, type AgendaItem } from "@/lib/agenda";
+import { betreft, overlapt, type AgendaItem } from "@/lib/agenda";
+import { alleItems } from "@/lib/bord";
 import { dag, kortLabel, maandagVan, plusDagen, vandaag as vandaagDatum, WEEKDAG_LANG } from "@/lib/datum";
 import { useGezin } from "./context";
 import { useExtern } from "./useExtern";
@@ -12,10 +13,12 @@ export function Agenda({
   nieuweAfspraak,
   bewerkAfspraak,
   naarTab,
+  kop = true,
 }: {
   nieuweAfspraak: (datum: string) => void;
   bewerkAfspraak: (id: string) => void;
   naarTab: (t: string) => void;
+  kop?: boolean;
 }) {
   const { staat } = useGezin();
   const vandaag = vandaagDatum();
@@ -26,7 +29,7 @@ export function Agenda({
 
   const items = useMemo(
     () =>
-      sorteer([...appItems(staat, maandag, zondag), ...extern.items]).filter(
+      alleItems(staat, extern.items, maandag, zondag).filter(
         (i) => !filter.length || filter.some((f) => betreft(i, f)),
       ),
     [staat, maandag, zondag, extern.items, filter],
@@ -35,7 +38,7 @@ export function Agenda({
   // Botsingen: twee dingen tegelijk voor hetzelfde gezinslid (een kind, of de ouder die het regelt).
   const botsingen = useMemo(() => {
     const uit = new Set<string>();
-    const wie = (i: AgendaItem) => new Set([...i.leden, ...(i.regelaar ? [i.regelaar] : [])]);
+    const wie = (i: AgendaItem) => new Set([...i.leden, i.regelaar, i.brengt, i.haalt].filter((x): x is string => !!x));
     for (let a = 0; a < items.length; a++) {
       for (let b = a + 1; b < items.length && items[b].datum === items[a].datum; b++) {
         const wa = wie(items[a]);
@@ -53,7 +56,7 @@ export function Agenda({
     <>
       <div className="kop">
         <div>
-          <h1>Agenda</h1>
+          {kop && <h1>Agenda</h1>}
           <div className="sub">
             Week {d0.weekNumber} · {kortLabel(maandag)} t/m {kortLabel(zondag)}
           </div>

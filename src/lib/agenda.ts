@@ -22,6 +22,11 @@ export interface AgendaItem {
   refId: string;
   gedaan?: boolean;
   bron?: string;
+  /** Wie brengt en wie haalt (bij afspraken, ook uit gekoppelde agenda's). */
+  brengt?: string | null;
+  haalt?: string | null;
+  /** Bij een afspraak uit een gekoppelde agenda: agenda-id|uid|datum, om brengen en halen aan te koppelen. */
+  regelSleutel?: string;
 }
 
 /** Afspraken en (ingeplande) taken van de app binnen [van, tot]. */
@@ -39,6 +44,8 @@ export function appItems(staat: Staat, van: string, tot: string): AgendaItem[] {
         eind: a.heleDag ? undefined : a.eind,
         leden: a.leden,
         regelaar: a.regelaar,
+        brengt: a.brengt,
+        haalt: a.haalt,
         locatie: a.locatie || undefined,
         notitie: a.notitie || undefined,
         refId: a.id,
@@ -85,7 +92,16 @@ export function sorteer(items: AgendaItem[]): AgendaItem[] {
 
 /** Gaat het item over dit gezinslid? */
 export function betreft(item: AgendaItem, lid: string): boolean {
-  return item.leden.includes(lid) || item.regelaar === lid;
+  return item.leden.includes(lid) || item.regelaar === lid || item.brengt === lid || item.haalt === lid;
+}
+
+/** Zet brengen en halen bij afspraken uit gekoppelde agenda's (die bewaart de app apart). */
+export function metRegelingen(items: AgendaItem[], staat: Staat): AgendaItem[] {
+  const r = new Map(staat.externRegelingen.map((x) => [x.sleutel, x]));
+  return items.map((i) => {
+    const x = i.regelSleutel ? r.get(i.regelSleutel) : undefined;
+    return x ? { ...i, brengt: x.brengt, haalt: x.haalt } : i;
+  });
 }
 
 /** Twee items van dezelfde persoon die elkaar in de tijd overlappen. */

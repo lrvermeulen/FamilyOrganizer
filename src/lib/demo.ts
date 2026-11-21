@@ -1,5 +1,6 @@
 import type { DateTime } from "luxon";
-import { alsDatum, plusDagen } from "./datum";
+import { afdelingVan } from "./boodschappen";
+import { alsDatum, maandagVan, plusDagen } from "./datum";
 import { voorvallen } from "./herhaling";
 import { SJABLONEN } from "./sjablonen";
 import { StaatSchema, type Afspraak, type Staat, type Taak, type Voltooiing } from "./types";
@@ -57,6 +58,7 @@ export function demoStaat(nu: DateTime): Staat {
     herhaling: s.herhaling,
     duurMin: s.duurMin,
     denkwerk: s.denkwerk,
+    werksoort: s.werksoort ?? "denkwerk",
     eigenaar: eigenaarVan[s.titel] ?? null,
     uitvoerder: uitvoerderVan[s.titel] ?? null,
     voor: s.categorie === "kinderen" || s.categorie === "school" ? ["fien", "sem"] : [],
@@ -74,6 +76,7 @@ export function demoStaat(nu: DateTime): Staat {
     herhaling: { soort: "geen", interval: 1, dagen: [] },
     duurMin: 90,
     denkwerk: 3,
+    werksoort: "denkwerk",
     eigenaar: "anna",
     uitvoerder: "bram",
     voor: ["fien", "sem"],
@@ -111,6 +114,8 @@ export function demoStaat(nu: DateTime): Staat {
   const afspraak = (a: Partial<Afspraak> & Pick<Afspraak, "id" | "titel" | "datum" | "leden">): Afspraak => ({
     heleDag: false,
     regelaar: null,
+    brengt: null,
+    haalt: null,
     locatie: "",
     notitie: "",
     herhaling: { soort: "geen", interval: 1, dagen: [] },
@@ -120,8 +125,8 @@ export function demoStaat(nu: DateTime): Staat {
   });
   const maandag = alsDatum(nu.startOf("week").minus({ weeks: 5 }));
   const afspraken: Afspraak[] = [
-    afspraak({ id: "a1", titel: "Zwemles", datum: plusDagen(maandag, 2), begin: "15:30", eind: "16:15", leden: ["fien"], regelaar: "anna", locatie: "Zwembad", herhaling: { soort: "wekelijks", interval: 1, dagen: [3] } }),
-    afspraak({ id: "a2", titel: "Voetbal", datum: plusDagen(maandag, 5), begin: "09:00", eind: "10:00", leden: ["sem"], regelaar: "bram", herhaling: { soort: "wekelijks", interval: 1, dagen: [6] } }),
+    afspraak({ id: "a1", titel: "Zwemles", datum: plusDagen(maandag, 2), begin: "15:30", eind: "16:15", leden: ["fien"], regelaar: "anna", brengt: "anna", locatie: "Zwembad", herhaling: { soort: "wekelijks", interval: 1, dagen: [3] } }),
+    afspraak({ id: "a2", titel: "Voetbal", datum: plusDagen(maandag, 5), begin: "09:00", eind: "10:00", leden: ["sem"], regelaar: "bram", brengt: "bram", haalt: "bram", herhaling: { soort: "wekelijks", interval: 1, dagen: [6] } }),
     afspraak({ id: "a3", titel: "Tandarts", datum: plusDagen(vandaag, 4), begin: "08:30", eind: "09:00", leden: ["fien", "sem"], regelaar: "anna" }),
     afspraak({ id: "a4", titel: "Studiedag school", datum: plusDagen(vandaag, 9), heleDag: true, leden: ["fien"], regelaar: "bram" }),
     afspraak({ id: "a5", titel: "Etentje met vrienden", datum: plusDagen(vandaag, 6), begin: "19:00", eind: "22:30", leden: ["anna", "bram"], aangemaaktDoor: "bram" }),
@@ -144,5 +149,27 @@ export function demoStaat(nu: DateTime): Staat {
     gesprekken: [],
     ronde: 1,
     feedSleutel: "demo",
+    keukenSleutel: "demo",
+    inboxSleutel: "demo",
+    regio: "midden",
+    maaltijden: [
+      ["Pasta pesto", "bram", ["pasta", "pesto", "cherrytomaten"]],
+      ["Stamppot boerenkool", "anna", ["boerenkool", "aardappels", "rookworst"]],
+      ["Taco's", "bram", ["tortilla's", "gehakt", "sla", "geraspte kaas"]],
+      ["", null, []],
+      ["Pannenkoeken", "bram", ["melk", "eieren", "bloem"]],
+      ["Pizza", null, []],
+      ["Soep met brood", "anna", ["soep", "stokbrood"]],
+    ]
+      .map(([wat, kok, ingredienten], i) => ({ datum: plusDagen(maandagVan(vandaag), i), wat, kok, ingredienten }))
+      .filter((m) => m.wat),
+    boodschappen: ["Melk", "Bananen", "Luiers maat 5", "Hagelslag", "Wc-papier", "Tortilla's"].map((naam, i) => ({
+      id: `b${i}`,
+      naam,
+      afdeling: afdelingVan(naam),
+      gekocht: false,
+      door: i % 2 ? "bram" : "anna",
+      op: `${vandaag}T08:00:00.000+01:00`,
+    })),
   });
 }

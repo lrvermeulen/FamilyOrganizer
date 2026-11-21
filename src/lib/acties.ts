@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { afdelingVan } from "./boodschappen";
 import {
   AfspraakSchema,
   CategorieSchema,
@@ -10,7 +11,10 @@ import {
   KLEUREN,
   Klok,
   LidSchema,
+  MaaltijdSchema,
+  MeldingInstellingSchema,
   TaakSchema,
+  WerksoortSchema,
   type Staat,
 } from "./types";
 
@@ -29,6 +33,7 @@ const TaakInvoer = z.object({
   herhaling: HerhalingSchema,
   duurMin: TaakSchema.shape.duurMin,
   denkwerk: DenkwerkSchema,
+  werksoort: WerksoortSchema.default("denkwerk"),
   eigenaar: Id.nullable(),
   uitvoerder: Id.nullable().default(null),
   voor: z.array(Id).default([]),
@@ -78,14 +83,47 @@ export const ActieSchema = z.discriminatedUnion("type", [
     agenda: ExterneAgendaSchema.omit({ id: true }).extend({ id: Id.optional(), url: z.string().trim().max(2000) }),
   }),
   z.object({ type: z.literal("agenda.verwijderen"), id: Id }),
-  z.object({ type: z.literal("opgemerkt.toevoegen"), tekst: z.string().trim().min(1).max(500) }),
+  z.object({
+    type: z.literal("opgemerkt.toevoegen"),
+    tekst: z.string().trim().min(1).max(2000),
+    bron: z.enum(["zelf", "plakken", "foto", "delen"]).default("zelf"),
+    /** Meteen verwerkt (bijvoorbeeld een geplakt bericht waar direct een afspraak van is gemaakt). */
+    afgehandeld: z.boolean().default(false),
+  }),
   z.object({ type: z.literal("opgemerkt.afhandelen"), id: Id, taakId: Id.optional() }),
   z.object({ type: z.literal("opgemerkt.verwijderen"), id: Id }),
   z.object({
     type: z.literal("inschatting.opslaan"),
     denkwerk: z.number().int().min(0).max(100),
     uitvoeren: z.number().int().min(0).max(100),
+    emotioneel: z.number().int().min(0).max(100).optional(),
   }),
+  z.object({
+    type: z.literal("perceptie.opslaan"),
+    taakId: Id,
+    antwoord: z.enum(["ik", "ander", "samen", "weetniet", "nvt"]).nullable(),
+  }),
+  z.object({
+    type: z.literal("extern.regelen"),
+    sleutel: z.string().min(1).max(600),
+    datum: Datum,
+    titel: z.string().max(200),
+    leden: z.array(Id).max(12).default([]),
+    brengt: Id.nullable(),
+    haalt: Id.nullable(),
+  }),
+  z.object({ type: z.literal("maaltijd.opslaan"), maaltijd: MaaltijdSchema }),
+  z.object({
+    type: z.literal("boodschappen.toevoegen"),
+    namen: z.array(z.string().trim().min(1).max(80)).min(1).max(60),
+    voor: Datum.optional(),
+  }),
+  z.object({ type: z.literal("boodschap.afvinken"), id: Id, gekocht: z.boolean() }),
+  z.object({ type: z.literal("boodschap.verwijderen"), id: Id }),
+  z.object({ type: z.literal("boodschappen.opruimen") }),
+  z.object({ type: z.literal("meldingen.instellen"), instelling: MeldingInstellingSchema.omit({ lid: true }) }),
+  z.object({ type: z.literal("regio.instellen"), regio: z.enum(["noord", "midden", "zuid"]).nullable() }),
+  z.object({ type: z.literal("sleutel.vernieuwen"), welke: z.enum(["keuken", "inbox"]) }),
   z.object({ type: z.literal("gesprek.opslaan"), datum: Datum, afspraken: z.string().max(4000) }),
   z.object({ type: z.literal("feed.vernieuwen") }),
 ]);
@@ -137,6 +175,8 @@ export function pasToe(oud: Staat, ruweActie: unknown, ctx: Context): Staat {
   const actie = ActieSchema.parse(ruweActie);
   const staat: Staat = structuredClone(oud);
   if (!staat.feedSleutel) staat.feedSleutel = ctx.nieuweSleutel();
+  if (!staat.keukenSleutel) staat.keukenSleutel = ctx.nieuweSleutel();
+  if (!staat.inboxSleutel) staat.inboxSleutel = ctx.nieuweSleutel();
 
   if (actie.type !== "gezin.instellen") {
     if (staat.leden.length === 0) throw new ActieFout("Stel eerst het gezin in");
@@ -183,7 +223,7 @@ export function pasToe(oud: Staat, ruweActie: unknown, ctx: Context): Staat {
       if (actie.id === ctx.door) throw new ActieFout("Je kunt jezelf niet verwijderen");
       const inGebruik =
         staat.taken.some((t) => !t.gearchiveerd && (t.eigenaar === actie.id || t.uitvoerder === actie.id || t.voor.includes(actie.id))) ||
-        staat.afspraken.some((a) => a.leden.includes(actie.id) || a.regelaar === actie.id) ||
+        staat.afspraken.some((a) => a.leden.includes(actie.id) || [a.regelaar, a.brengt, a.haalt].includes(actie.id)) ||
         staat.agendas.some((a) => a.lid === actie.id);
       if (inGebruik) throw new ActieFout("Dit gezinslid hangt nog aan taken, afspraken of agenda's");
       staat.leden = staat.leden.filter((l) => l.id !== actie.id);
@@ -239,6 +279,8 @@ export function pasToe(oud: Staat, ruweActie: unknown, ctx: Context): Staat {
       const a = actie.afspraak;
       a.leden.forEach((l) => controleerLid(staat, l));
       controleerLid(staat, a.regelaar, true);
+      controleerLid(staat, a.brengt);
+      controleerLid(staat, a.haalt);
       const bestaand = a.id ? staat.afspraken.find((x) => x.id === a.id) : undefined;
       const afspraak = AfspraakSchema.parse({
         ...a,
@@ -277,7 +319,7 @@ export function pasToe(oud: Staat, ruweActie: unknown, ctx: Context): Staat {
       staat.agendas = staat.agendas.filter((a) => a.id !== actie.id);
       break;
     case "opgemerkt.toevoegen":
-      staat.opgemerkt.push({ id: ctx.nieuwId(), tekst: actie.tekst, door: ctx.door, op: ctx.nu, afgehandeld: false });
+      staat.opgemerkt.push({ id: ctx.nieuwId(), tekst: actie.tekst, door: ctx.door, op: ctx.nu, afgehandeld: actie.afgehandeld, bron: actie.bron });
       break;
     case "opgemerkt.afhandelen": {
       const o = vind(staat.opgemerkt, actie.id, "Notitie");
@@ -296,8 +338,73 @@ export function pasToe(oud: Staat, ruweActie: unknown, ctx: Context): Staat {
         ronde: staat.ronde,
         denkwerk: actie.denkwerk,
         uitvoeren: actie.uitvoeren,
+        emotioneel: actie.emotioneel,
         op: ctx.nu,
       });
+      break;
+    case "perceptie.opslaan":
+      vind(staat.taken, actie.taakId, "Taak");
+      staat.percepties = staat.percepties.filter(
+        (p) => !(p.door === ctx.door && p.ronde === staat.ronde && p.taakId === actie.taakId),
+      );
+      if (actie.antwoord) {
+        staat.percepties.push({ door: ctx.door, ronde: staat.ronde, taakId: actie.taakId, antwoord: actie.antwoord });
+      }
+      break;
+    case "extern.regelen": {
+      controleerLid(staat, actie.brengt);
+      controleerLid(staat, actie.haalt);
+      staat.externRegelingen = staat.externRegelingen.filter((r) => r.sleutel !== actie.sleutel);
+      if (actie.brengt || actie.haalt) {
+        staat.externRegelingen.push({
+          sleutel: actie.sleutel,
+          datum: actie.datum,
+          titel: actie.titel,
+          leden: actie.leden.filter((l) => staat.leden.some((x) => x.id === l)),
+          brengt: actie.brengt,
+          haalt: actie.haalt,
+        });
+      }
+      break;
+    }
+    case "maaltijd.opslaan": {
+      const m = actie.maaltijd;
+      controleerLid(staat, m.kok);
+      staat.maaltijden = staat.maaltijden.filter((x) => x.datum !== m.datum);
+      if (m.wat || m.ingredienten.length) staat.maaltijden.push(m);
+      staat.maaltijden.sort((a, b) => a.datum.localeCompare(b.datum));
+      break;
+    }
+    case "boodschappen.toevoegen": {
+      const open = new Set(staat.boodschappen.filter((b) => !b.gekocht).map((b) => b.naam.toLowerCase()));
+      for (const naam of actie.namen) {
+        // Wat al op de lijst staat, niet dubbel.
+        if (open.has(naam.toLowerCase())) continue;
+        open.add(naam.toLowerCase());
+        staat.boodschappen.push({ id: ctx.nieuwId(), naam, afdeling: afdelingVan(naam), gekocht: false, door: ctx.door, op: ctx.nu, voor: actie.voor });
+      }
+      break;
+    }
+    case "boodschap.afvinken":
+      vind(staat.boodschappen, actie.id, "Boodschap").gekocht = actie.gekocht;
+      break;
+    case "boodschap.verwijderen":
+      vind(staat.boodschappen, actie.id, "Boodschap");
+      staat.boodschappen = staat.boodschappen.filter((b) => b.id !== actie.id);
+      break;
+    case "boodschappen.opruimen":
+      staat.boodschappen = staat.boodschappen.filter((b) => !b.gekocht);
+      break;
+    case "meldingen.instellen":
+      staat.meldingen = staat.meldingen.filter((m) => m.lid !== ctx.door);
+      staat.meldingen.push({ ...actie.instelling, lid: ctx.door });
+      break;
+    case "regio.instellen":
+      staat.regio = actie.regio;
+      break;
+    case "sleutel.vernieuwen":
+      if (actie.welke === "keuken") staat.keukenSleutel = ctx.nieuweSleutel();
+      else staat.inboxSleutel = ctx.nieuweSleutel();
       break;
     case "gesprek.opslaan":
       staat.gesprekken.push({ id: ctx.nieuwId(), ronde: staat.ronde, datum: actie.datum, afspraken: actie.afspraken, op: ctx.nu });

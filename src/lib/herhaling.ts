@@ -58,6 +58,9 @@ export function voorvallen(start: string, h: Herhaling, van: string, tot: string
       }
       break;
     }
+    case "doorlopend":
+      // Geen vaste momenten: komt niet op de takenlijst of in de agenda.
+      break;
   }
   return uit.sort();
 }
@@ -90,6 +93,8 @@ export function herhalingLabel(h: Herhaling): string {
       return n === 1 ? "Elke maand" : n === 3 ? "Elk kwartaal" : n === 6 ? "Elk half jaar" : `Elke ${n} maanden`;
     case "jaarlijks":
       return n === 1 ? "Elk jaar" : `Elke ${n} jaar`;
+    case "doorlopend":
+      return n === 1 ? "Doorlopend (±1 keer per week)" : `Doorlopend (±${n} keer per week)`;
   }
 }
 
@@ -107,5 +112,7 @@ export function perWeek(h: Herhaling): number {
       return 12 / 52 / n;
     case "jaarlijks":
       return 1 / 52 / n;
+    case "doorlopend":
+      return h.interval;
   }
 }

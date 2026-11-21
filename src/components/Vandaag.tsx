@@ -100,7 +100,7 @@ export function VoorvalBlad({ v, sluit, bewerk }: { v: Voorval; sluit: () => voi
   );
 }
 
-export function ItemRegel({ item, klik }: { item: AgendaItem; klik?: () => void }) {
+export function ItemRegel({ item, klik, zonderRit }: { item: AgendaItem; klik?: () => void; zonderRit?: boolean }) {
   const { lid } = useGezin();
   const leden = item.leden.map((l) => lid(l)).filter((l) => !!l);
   const inhoud = (
@@ -119,6 +119,8 @@ export function ItemRegel({ item, klik }: { item: AgendaItem; klik?: () => void 
             item.eind && !item.heleDag ? `tot ${item.eind}` : "",
             item.locatie,
             item.soort === "afspraak" && item.regelaar ? `regelt: ${lid(item.regelaar)?.naam}` : "",
+            !zonderRit && item.brengt ? `brengt: ${lid(item.brengt)?.naam}` : "",
+            !zonderRit && item.haalt ? `haalt: ${lid(item.haalt)?.naam}` : "",
             item.bron ? `uit ${item.bron}` : "",
           ]
             .filter(Boolean)

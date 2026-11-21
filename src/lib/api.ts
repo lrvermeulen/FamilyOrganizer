@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { ZodError } from "zod";
 import { ActieFout } from "./acties";
 import { leesSessie, modus, SESSIE_COOKIE, type Sessie } from "./sessie";
@@ -44,4 +45,17 @@ export function basisUrl(req: NextRequest): string {
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "localhost:3000";
   const proto = req.headers.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   return `${proto}://${host}`;
+}
+
+/** Vergelijk een geheime sleutel uit een adres zonder tijdsverschil te lekken. */
+export function sleutelKlopt(gekregen: string | null | undefined, echt: string | null | undefined): boolean {
+  if (!gekregen || !echt) return false;
+  const x = Buffer.from(gekregen);
+  const y = Buffer.from(echt);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+/** Maak een publieke versie zonder de geheime sleutels voor de keukenstand. */
+export function voorKeuken(staat: Staat): Staat {
+  return { ...publiek(staat), feedSleutel: "", keukenSleutel: "", inboxSleutel: "", agendas: [], inschattingen: [], percepties: [], gesprekken: [] };
 }

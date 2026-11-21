@@ -14,6 +14,7 @@ function HerhalingVeld({ waarde, zet }: { waarde: Herhaling; zet: (h: Herhaling)
     wekelijks: ["week", "weken"],
     maandelijks: ["maand", "maanden"],
     jaarlijks: ["jaar", "jaar"],
+    doorlopend: ["keer per week", "keer per week"],
     geen: ["", ""],
   }[waarde.soort];
   return (

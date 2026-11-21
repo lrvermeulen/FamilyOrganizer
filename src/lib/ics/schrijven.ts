@@ -2,6 +2,7 @@ import { DateTime } from "luxon";
 import { appItems, type AgendaItem } from "../agenda";
 import { dag, plusDagen, TIJDZONE } from "../datum";
 import type { Staat } from "../types";
+import { vakantiesIn } from "../vakanties";
 
 /** Tekst veilig maken voor iCal (RFC 5545, 3.3.11). */
 export function ontsnap(tekst: string): string {
@@ -98,6 +99,19 @@ export function schrijfFeed(staat: Staat, opties: FeedOpties): string {
     if (omschrijving.length) r.push(`DESCRIPTION:${ontsnap(omschrijving.join("\n"))}`);
     if (item.soort === "taak") r.push("TRANSP:TRANSPARENT");
     r.push("END:VEVENT");
+  }
+  // Schoolvakanties van de gekozen regio, als één afspraak over meerdere dagen.
+  for (const v of vakantiesIn(staat.regio, opties.van, opties.tot)) {
+    r.push(
+      "BEGIN:VEVENT",
+      `UID:vakantie-${v.regio}-${v.van}@${opties.domein}`,
+      `DTSTAMP:${stempel}`,
+      `DTSTART;VALUE=DATE:${datumWaarde(v.van)}`,
+      `DTEND;VALUE=DATE:${datumWaarde(plusDagen(v.tot, 1))}`,
+      `SUMMARY:${ontsnap(v.naam)}`,
+      "TRANSP:TRANSPARENT",
+      "END:VEVENT",
+    );
   }
   r.push("END:VCALENDAR");
   return r.map(vouw).join("\r\n") + "\r\n";

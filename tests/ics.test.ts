@@ -127,3 +127,16 @@ describe("iCal schrijven", () => {
     expect(alleenA).toContain("SUMMARY:Zwemles\r\n");
   });
 });
+
+describe("vakanties in de feed", () => {
+  it("zet de vakanties van de gekozen regio erin", () => {
+    let s = pasToe(legeStaat(), { type: "gezin.instellen", gezinsnaam: "V", leden: [{ id: "a", naam: "A", rol: "ouder" }] }, ctx);
+    const zonder = schrijfFeed(s, { van: "2026-12-01", tot: "2027-01-31", nu: DateTime.now(), domein: "x" });
+    expect(zonder).not.toContain("Kerstvakantie");
+    s = pasToe(s, { type: "regio.instellen", regio: "midden" }, ctx);
+    const met = schrijfFeed(s, { van: "2026-12-01", tot: "2027-01-31", nu: DateTime.now(), domein: "x" });
+    expect(met).toContain("SUMMARY:Kerstvakantie");
+    expect(met).toContain("DTSTART;VALUE=DATE:20261219");
+    expect(met).toContain("DTEND;VALUE=DATE:20270104");
+  });
+});

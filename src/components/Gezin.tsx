@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { KLEUREN, type ExterneAgenda, type Lid } from "@/lib/types";
+import { KLEUREN, REGIOS, type ExterneAgenda, type Lid, type Regio } from "@/lib/types";
 import { post, useGezin } from "./context";
 import { Blad, Bolletje, Keuzes } from "./ui";
 
@@ -110,6 +110,60 @@ function Kopieer({ tekst }: { tekst: string }) {
   );
 }
 
+function Vakanties() {
+  const { staat, doe, bezig } = useGezin();
+  return (
+    <div className="kaart">
+      <h2>Schoolvakanties</h2>
+      <p className="stil klein">
+        In welke regio zit de school? Dan staan de vakanties op het bord en in de agenda-abonnementen (bron: Rijksoverheid). Studiedagen
+        verschillen per school: die komen via de Social Schools-agenda of de inbox binnen.
+      </p>
+      <Keuzes
+        label="Regio"
+        waarde={staat.regio}
+        kies={(regio) => !bezig && doe({ type: "regio.instellen", regio })}
+        opties={[...(Object.keys(REGIOS) as Regio[]).map((r) => ({ waarde: r as Regio | null, label: REGIOS[r] })), { waarde: null, label: "Niet tonen" }]}
+      />
+      <p className="stil klein" style={{ marginTop: 6 }}>
+        Weet je de regio niet? Zoek je gemeente op bij rijksoverheid.nl (&quot;schoolvakanties per regio&quot;).
+      </p>
+    </div>
+  );
+}
+
+function KeukenLink() {
+  const { staat, basis, doe, bezig } = useGezin();
+  const adres = `${basis}/keuken/${staat.keukenSleutel}`;
+  return (
+    <div className="kaart">
+      <h2>Keukenstand</h2>
+      <p className="stil klein">
+        Het weekbord groot op een tablet in de keuken, voor het hele gezin, ook de kinderen. Alleen om te bekijken; het ververst zichzelf.
+        Open dit adres op de tablet en zet het op het beginscherm. Zet de tablet in de instellingen op &quot;scherm niet automatisch
+        vergrendelen&quot; zolang hij aan de lader hangt.
+      </p>
+      <code className="adres">{adres}</code>
+      <div className="rij">
+        <Kopieer tekst={adres} />
+        <a className="knop klein" href={adres} target="_blank" rel="noreferrer">
+          Bekijken
+        </a>
+        <button
+          className="knop klein gevaar"
+          disabled={bezig}
+          onClick={() => confirm("Nieuwe link maken? De oude werkt dan niet meer.") && doe({ type: "sleutel.vernieuwen", welke: "keuken" })}
+        >
+          Nieuwe link
+        </button>
+      </div>
+      <p className="stil klein">
+        Wie de link heeft, ziet het weekbord (afspraken, eten, boodschappen), maar niet de inzichten of de adressen van jullie agenda&apos;s.
+      </p>
+    </div>
+  );
+}
+
 function Feeds() {
   const { staat, basis, doe, bezig, modus } = useGezin();
   const feeds = [{ naam: "Hele gezin", bestand: "gezin" }, ...staat.leden.map((l) => ({ naam: l.naam, bestand: l.id }))];
@@ -213,7 +267,12 @@ function AgendaBlad({ agenda, sluit }: { agenda?: ExterneAgenda; sluit: () => vo
             link heeft, kan de agenda zien. Deel hem dus alleen met de app.
           </p>
           <p className="klein">
-            <b>Schoolagenda of sportclub:</b> veel scholen en clubs bieden een iCal- of webcal-link aan. Die werkt ook.
+            <b>Social Schools:</b> open de agenda in Social Schools. In de webapp: rechtsboven <b>Abonneren</b> en kopieer de link. In de
+            app: <b>Opties</b> → <b>Abonneer</b>. Kies hieronder bij &quot;Van wie&quot; het kind. Let op: Social Schools geeft wijzigingen
+            soms pas na een dag door.
+          </p>
+          <p className="klein">
+            <b>Sportclub of andere school:</b> veel clubs en scholen bieden een iCal- of webcal-link aan. Die werkt ook.
           </p>
         </details>
         <label className="veld" style={{ marginTop: 10 }}>
@@ -326,6 +385,10 @@ export function Gezin() {
           + Agenda koppelen
         </button>
       </div>
+
+      <Vakanties />
+
+      <KeukenLink />
 
       <Feeds />
 

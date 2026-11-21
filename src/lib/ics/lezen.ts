@@ -84,6 +84,7 @@ export function leesIcs(tekst: string, agenda: ExterneAgenda, van: string, tot: 
         locatie: agenda.alleenBezet ? undefined : ev.location || undefined,
         refId: agenda.id,
         bron: agenda.naam,
+        regelSleutel: `${agenda.id}|${uid}|${datum}`,
       });
     }
   };

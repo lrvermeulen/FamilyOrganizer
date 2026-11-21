@@ -28,10 +28,16 @@ export async function voerUit(actie: unknown, door: string): Promise<Staat> {
   throw new Error("Het lukte niet om op te slaan, probeer het nog eens");
 }
 
-/** Zorg dat er een feedsleutel is (nodig voor de agenda-adressen). */
+/** Zorg dat de geheime sleutels er zijn (agenda-adressen, keukenstand, inbox). */
 export async function staatMetSleutel(): Promise<Staat> {
   const staat = await laadStaat();
-  if (staat.feedSleutel || staat.leden.length === 0) return staat;
-  const nieuw = { ...staat, feedSleutel: nieuweSleutel(), versie: staat.versie + 1 };
+  if ((staat.feedSleutel && staat.keukenSleutel && staat.inboxSleutel) || staat.leden.length === 0) return staat;
+  const nieuw = {
+    ...staat,
+    feedSleutel: staat.feedSleutel || nieuweSleutel(),
+    keukenSleutel: staat.keukenSleutel || nieuweSleutel(),
+    inboxSleutel: staat.inboxSleutel || nieuweSleutel(),
+    versie: staat.versie + 1,
+  };
   return (await opslag().zetAls(sleutel(), staat.versie, nieuw.versie, JSON.stringify(nieuw))) ? nieuw : laadStaat();
 }
