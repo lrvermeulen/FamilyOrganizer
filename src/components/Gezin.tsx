@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { KLEUREN, REGIOS, type ExterneAgenda, type Lid, type Regio } from "@/lib/types";
 import { post, useGezin } from "./context";
+import { Meldingen } from "./Meldingen";
 import { Blad, Bolletje, Keuzes } from "./ui";
 
 function LidBlad({ lid, sluit }: { lid?: Lid; sluit: () => void }) {
@@ -385,6 +386,8 @@ export function Gezin() {
           + Agenda koppelen
         </button>
       </div>
+
+      <Meldingen />
 
       <Vakanties />
 

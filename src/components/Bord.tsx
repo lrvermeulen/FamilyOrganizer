@@ -12,7 +12,7 @@ import { useGezin } from "./context";
 import { TaakFormulier } from "./Formulieren";
 import { MaaltijdBlad } from "./Lijsten";
 import { useExtern } from "./useExtern";
-import { ItemRegel, TaakRegel, VoorvalBlad } from "./Vandaag";
+import { ItemRegel, TaakRegel, VoorvalBlad } from "./Regels";
 import { Blad, Bolletje, Keuzes } from "./ui";
 
 function naam(staat: Staat, id: string | null | undefined) {

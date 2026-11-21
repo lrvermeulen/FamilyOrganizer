@@ -4,11 +4,11 @@ import { useState } from "react";
 import type { AfspraakInvoer, TaakInvoer } from "@/lib/acties";
 import { vandaag as vandaagDatum, WEEKDAG_KORT } from "@/lib/datum";
 import { herhalingLabel } from "@/lib/herhaling";
-import { CATEGORIEEN, DENKWERK, type Afspraak, type Categorie, type Denkwerk, type Herhaling, type Taak } from "@/lib/types";
+import { CATEGORIEEN, DENKWERK, type Afspraak, type Categorie, type Denkwerk, type Herhaling, type Taak, type Werksoort } from "@/lib/types";
 import { useGezin } from "./context";
 import { Blad, Keuzes, LedenKeuze } from "./ui";
 
-function HerhalingVeld({ waarde, zet }: { waarde: Herhaling; zet: (h: Herhaling) => void }) {
+function HerhalingVeld({ waarde, zet, metDoorlopend }: { waarde: Herhaling; zet: (h: Herhaling) => void; metDoorlopend?: boolean }) {
   const [een, meer] = {
     dagelijks: ["dag", "dagen"],
     wekelijks: ["week", "weken"],
@@ -30,12 +30,13 @@ function HerhalingVeld({ waarde, zet }: { waarde: Herhaling; zet: (h: Herhaling)
           { waarde: "wekelijks", label: "Wekelijks" },
           { waarde: "maandelijks", label: "Maandelijks" },
           { waarde: "jaarlijks", label: "Jaarlijks" },
+          ...(metDoorlopend ? [{ waarde: "doorlopend" as const, label: "Doorlopend" }] : []),
         ]}
       />
       {waarde.soort !== "geen" && (
         <div style={{ marginTop: 10 }} className="stapel">
           <label className="rij">
-            <span>Elke</span>
+            <span>{waarde.soort === "doorlopend" ? "Ongeveer" : "Elke"}</span>
             <input
               type="number"
               min={1}
@@ -46,6 +47,12 @@ function HerhalingVeld({ waarde, zet }: { waarde: Herhaling; zet: (h: Herhaling)
             />
             <span>{waarde.interval === 1 ? een : meer}</span>
           </label>
+          {waarde.soort === "doorlopend" && (
+            <div className="stil klein">
+              Iets zonder vaste momenten, zoals troosten of merken hoe het met de kinderen gaat. Het komt niet op de takenlijst, maar telt
+              wel mee in het inzicht.
+            </div>
+          )}
           {waarde.soort === "wekelijks" && (
             <div className="keuzes" aria-label="Op welke dagen">
               {WEEKDAG_KORT.map((d, i) => {
@@ -151,7 +158,7 @@ export function TaakFormulier({
             <input type="time" value={t.tijd ?? ""} onChange={(e) => wijzig({ tijd: e.target.value || undefined })} />
           </label>
         </div>
-        <HerhalingVeld waarde={t.herhaling as Herhaling} zet={(herhaling) => wijzig({ herhaling })} />
+        <HerhalingVeld metDoorlopend waarde={t.herhaling as Herhaling} zet={(herhaling) => wijzig({ herhaling })} />
 
         <div className="veld" style={{ marginBottom: 12 }}>
           <span className="veld-label">Wie houdt het in het hoofd? (eraan denken, plannen, bewaken)</span>
@@ -175,7 +182,7 @@ export function TaakFormulier({
         </label>
 
         <div className="veld" style={{ marginBottom: 12 }}>
-          <span className="veld-label">Hoeveel denkwerk zit erin?</span>
+          <span className="veld-label">Hoe zwaar is het onzichtbare deel?</span>
           <Keuzes
             label="Denkwerk"
             waarde={t.denkwerk as Denkwerk}
@@ -185,6 +192,18 @@ export function TaakFormulier({
           <div className="stil klein" style={{ marginTop: 4 }}>
             {DENKWERK[t.denkwerk as Denkwerk].uitleg}
           </div>
+        </div>
+        <div className="veld" style={{ marginBottom: 12 }}>
+          <span className="veld-label">Wat voor onzichtbaar werk is het vooral?</span>
+          <Keuzes
+            label="Soort werk"
+            waarde={(t.werksoort ?? "denkwerk") as Werksoort}
+            kies={(werksoort) => wijzig({ werksoort })}
+            opties={[
+              { waarde: "denkwerk", label: "Denkwerk", titel: "Bedenken, plannen, onthouden, bewaken" },
+              { waarde: "emotioneel", label: "Emotioneel werk", titel: "Aandacht en zorg, merken hoe het met iemand gaat" },
+            ]}
+          />
         </div>
         <label className="veld">
           <span>Hoe lang duurt het uitvoeren? (minuten)</span>
@@ -339,36 +358,6 @@ export function AfspraakFormulier({ afspraak, datum, sluit }: { afspraak?: Afspr
           )}
           <button className="knop hoofd" disabled={bezig}>
             Opslaan
-          </button>
-        </div>
-      </form>
-    </Blad>
-  );
-}
-
-export function OpgemerktFormulier({ sluit }: { sluit: () => void }) {
-  const { doe, bezig } = useGezin();
-  const [tekst, zet] = useState("");
-  return (
-    <Blad titel="Opgemerkt" sluit={sluit}>
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (tekst.trim() && (await doe({ type: "opgemerkt.toevoegen", tekst }))) sluit();
-        }}
-      >
-        <p className="stil klein">
-          Iets wat je ziet of bedenkt en wat geregeld moet worden. Leg het vast, dan hoef je het niet te onthouden. Het telt
-          mee als denkwerk: iets opmerken is ook werk.
-        </p>
-        <label className="veld">
-          <span>Wat schoot je te binnen?</span>
-          <textarea autoFocus required maxLength={500} value={tekst} onChange={(e) => zet(e.target.value)} placeholder="De winterjassen worden te klein" />
-        </label>
-        <div className="blad-voet">
-          <span />
-          <button className="knop hoofd" disabled={bezig || !tekst.trim()}>
-            Vastleggen
           </button>
         </div>
       </form>

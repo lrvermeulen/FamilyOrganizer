@@ -954,3 +954,31 @@ button.raster-item {
 .keuken-onder .kaart {
   font-size: 1.05rem;
 }
+
+/* Kaartjesronde */
+.voortgang {
+  height: 6px;
+  background: var(--vlak-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.voortgang i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+.antwoorden {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+.antwoorden .knop {
+  min-height: 52px;
+  font-size: 1rem;
+}
+.antwoorden .knop:nth-child(3) {
+  grid-column: span 2;
+}

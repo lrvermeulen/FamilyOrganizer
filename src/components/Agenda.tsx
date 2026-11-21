@@ -6,7 +6,7 @@ import { alleItems } from "@/lib/bord";
 import { dag, kortLabel, maandagVan, plusDagen, vandaag as vandaagDatum, WEEKDAG_LANG } from "@/lib/datum";
 import { useGezin } from "./context";
 import { useExtern } from "./useExtern";
-import { ItemRegel } from "./Vandaag";
+import { ItemRegel } from "./Regels";
 import { LedenKeuze } from "./ui";
 
 export function Agenda({

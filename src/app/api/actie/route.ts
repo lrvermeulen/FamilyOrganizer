@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { fout, foutBericht, publiek, sessieVan } from "@/lib/api";
 import { laadStaat, voerUit } from "@/lib/dienst";
+import { afgevinktMeldingen } from "@/lib/meldingen";
+import { abonnementen, verstuur } from "@/lib/push";
 import { cookieOpties, maakSessie, SESSIE_COOKIE } from "@/lib/sessie";
 
 export async function POST(req: NextRequest) {
@@ -15,6 +17,17 @@ export async function POST(req: NextRequest) {
     if (isStart) door = typeof body.ik === "string" ? body.ik : null;
     else if (!door || !(await laadStaat()).leden.some((l) => l.id === door)) return fout("Kies eerst wie je bent", 409);
     const staat = await voerUit(body.actie, door ?? "");
+    if (body.actie.type === "taak.afvinken" && door) {
+      // De andere ouder een seintje geven, als die dat wil. Mislukt dat, dan is het afvinken toch gelukt.
+      try {
+        const taakId = (body.actie as { taakId?: string }).taakId;
+        const titel = staat.taken.find((t) => t.id === taakId)?.titel;
+        const metAbo = new Set((await abonnementen()).map((a) => a.lid));
+        if (titel) await verstuur(afgevinktMeldingen(staat, door, titel, metAbo));
+      } catch (e) {
+        console.error("Melding afvinken", e);
+      }
+    }
     const res = NextResponse.json({ staat: publiek(staat) });
     if (isStart) {
       const ik = staat.leden.find((l) => l.id === door && l.rol === "ouder")?.id ?? null;

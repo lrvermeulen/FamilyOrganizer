@@ -1,47 +1,69 @@
 # Gezinsplanner
 
-Een app voor twee ouders om het gezin samen te organiseren: vaste en losse taken, één agenda voor iedereen die meeloopt met Google Agenda en Apple Agenda, en inzicht in hoe de **mentale last** verdeeld is, als basis voor het gesprek daarover.
+Een app voor twee ouders om het gezin samen te organiseren. Alles komt samen op één digitaal **Weekbord**: afspraken van iedereen (ook uit Google, Apple, school en sportclub), wie brengt en haalt, wat jullie eten, taken en boodschappen. Daarnaast geeft de app inzicht in hoe de **mentale last** verdeeld is, als basis voor het gesprek daarover.
 
 Installeren en online zetten: zie [SETUP.md](SETUP.md).
 
-## Onderdelen
+## Hoe het in elkaar zit
+
+```
+  Binnen                       Centrum                        Naar buiten
+  ─────────────────            ──────────────────             ──────────────────────
+  Typen of plakken   ┐                                    ┌   Ochtendbriefing (push)
+  Screenshot         │                                    │   Herinneringen (push)
+  Delen (Android)    ├─► Inbox ─►  Weekbord  ─────────────┤   Seintje bij afvinken
+  Opdracht (iPhone)  │            (dag, week, keuken)     │   Agenda-abonnementen
+  Google / Apple     │               ▲                    │   (Google en Apple)
+  Social Schools     ┘               │                    └   Keukentablet
+  Schoolvakanties ───────────────────┘
+                         Lijsten: taken, boodschappen, menu
+                         Inzicht: denkwerk, emotioneel werk, uitvoeren
+```
 
 | Tabblad | Wat je er doet |
 |---|---|
-| **Vandaag** | Agenda van vandaag en morgen, taken die vandaag aan de beurt zijn of zijn blijven liggen, en de lijst "Opgemerkt". Afvinken met één tik; tik op een taak om te kiezen wie het deed, hoe lang het duurde, of om hem over te slaan. |
-| **Agenda** | Weekoverzicht van het hele gezin: afspraken uit de app, ingeplande taken en de gekoppelde agenda's (Google, Apple, school, club). Filteren per gezinslid. De app waarschuwt als iemand twee dingen tegelijk heeft. |
-| **Taken** | Alle taken per soort. Met **Verdelen** lopen jullie samen de taken langs en kiezen per taak wie hem *in het hoofd heeft* en wie hem *uitvoert*. Starttaken voor een gezin met jonge kinderen staan klaar. |
-| **Inzicht** | Hoe het denkwerk en het uitvoeren verdeeld zijn, hoe jullie dat zelf inschatten, en hulp bij het gesprek. |
-| **Gezin** | Gezinsleden, agenda's koppelen, agenda-abonnementen voor Google en Apple, wie je bent. |
+| **Bord** | Het centrum. **Dag**: eten, wie moet waarheen (met brengen en halen), taken van de dag. **Week**: een kolom per gezinslid plus eten, net als een weekbord in de keuken. **Agenda**: alles als lijst, te filteren per gezinslid. Met **Week doorlopen** lopen jullie (bijvoorbeeld op zondag) samen langs wat nog open staat. |
+| **Inbox** | Alles wat binnenkomt: een bericht dat je plakt, een screenshot, iets wat je deelt vanuit WhatsApp, of wat je opviel. De app doet een voorstel (afspraak, taak of boodschappen); jij bevestigt. |
+| **Lijsten** | **Taken** (met **Verdelen**: samen per taak kiezen wie hem in het hoofd heeft en wie hem uitvoert), **Boodschappen** per afdeling en het **Menu** per dag. |
+| **Inzicht** | Hoe denkwerk, emotioneel werk en uitvoeren verdeeld zijn, de kaartjesronde, en hulp bij het gesprek. |
+| **Gezin** | Gezinsleden, meldingen, schoolvakanties, de keukenstand, agenda's koppelen en agenda-abonnementen. |
 
-Met de **+**-knop leg je overal snel een taak, afspraak of iets "Opgemerkt" vast.
+Met de **+**-knop typ je overal snel iets in, zoals "tandarts Nine do 14:00" of "melk, kaas en appels op de lijst".
+
+## Zonder AI
+
+De invoerregel en de inbox gebruiken vaste regels, geen AI: ze herkennen datums ("vrijdag", "28 november", "volgende week dinsdag"), tijden ("14:00", "half drie", "van 15:30 tot 16:15"), namen van gezinsleden, deadlines ("uiterlijk", "inleveren") en boodschappen. Een geplakte brief met meerdere datums geeft meerdere voorstellen. Tekst uit een screenshot wordt op de telefoon zelf gelezen (Tesseract; de Nederlandse taal wordt de eerste keer gedownload). Er gaat niets naar een AI.
 
 ## Mentale last: hoe de app rekent
 
-Elke taak heeft een **eigenaar** (wie het in het hoofd heeft: eraan denken, plannen, bewaken) en eventueel een andere **uitvoerder**. Die twee zijn in de praktijk vaak verschillend verdeeld, en dat verschil is precies waar het gesprek over gaat.
+Elke taak heeft een **eigenaar** (wie het in het hoofd heeft: eraan denken, plannen, bewaken) en eventueel een andere **uitvoerder**. Het onzichtbare deel is **denkwerk** (bedenken, plannen, onthouden, bewaken) of **emotioneel werk** (aandacht en zorg, merken hoe het met iemand gaat).
 
-- **Denkwerk** (onzichtbaar): elke keer dat een taak aan de beurt is, krijgt de eigenaar 1, 2 of 3 punten (licht, gemiddeld, zwaar). Ook als iemand anders hem uitvoert, of als hij blijft liggen. Een afspraak regelen (brengen, halen, erbij zijn) is 1 punt. Iets vastleggen bij "Opgemerkt" of een losse taak aanmaken ook: opmerken dat iets moet gebeuren is ook werk.
-- **Uitvoeren** (zichtbaar): de minuten van afgevinkte taken voor wie het deed, plus de duur van afspraken die iemand regelt.
-- **Zo verdeelt de takenlijst het werk**: los van wat er is afgevinkt, rekent de app uit hoe de huidige taakverdeling het werk per week verdeelt. Dat werkt meteen na het verdelen, zonder geschiedenis.
+- **Onzichtbaar werk** (punten): elke keer dat een taak aan de beurt is, krijgt de eigenaar 1, 2 of 3 punten (licht, gemiddeld, zwaar). Ook als iemand anders hem uitvoert, of als hij blijft liggen. Een **doorlopende verantwoordelijkheid** (zonder vaste momenten, zoals troosten) telt zo vaak per week als ingesteld. Een afspraak regelen is 1 punt denkwerk, en iets vastleggen in de inbox of een losse taak aanmaken ook.
+- **Uitvoeren** (minuten): afgevinkte taken voor wie het deed, 20 minuten per keer brengen of halen (ook bij afspraken uit gekoppelde agenda's), en de duur van afspraken die iemand regelt zonder dat een ander brengt of haalt.
+- **Zo verdeelt de takenlijst het werk**: los van wat er is afgevinkt, hoe de huidige taakverdeling het werk per week verdeelt. Dat werkt meteen na het verdelen.
 
-Bij het afvinken legt de app vast wie op dat moment eigenaar was, zodat het overdragen van een taak de geschiedenis niet verandert.
-
-**Het gesprek.** Bij Inzicht vult ieder eerst los van de ander in hoe groot het eigen aandeel is. Pas als jullie allebei hebben ingevuld, zie je elkaars inschatting naast wat de app telt. Daarna volgen vragen om het gesprek te openen, en leg je de afspraken vast. Een nieuw gesprek start een nieuwe ronde inschattingen. Een taak overdragen gaat bij voorkeur in zijn geheel: eraan denken, plannen én uitvoeren.
+**De kaartjesronde.** Ieder geeft op de eigen telefoon per taak aan wie het in het hoofd heeft: ik, de ander, samen, weet niet of niet relevant. Daarna één vraag over het uitvoeren. Pas als jullie allebei klaar zijn, zien jullie elkaars antwoorden: het eigen aandeel volgens ieder, naast wat de app telt, en de taken waar jullie het verschillend zien. Per taak leg je dan vast wie de eigenaar wordt. Gespreksvragen helpen, en de afspraken bewaar je. Een nieuw gesprek start een nieuwe ronde.
 
 Dit is een eigen schatting om het gesprek te voeden, geen wetenschappelijke meting. Wat niet in de app staat, telt niet mee.
 
-## Agenda: koppelen met Google en Apple
+## Agenda's
 
 De app gebruikt iCal, de standaard die Google Agenda en Apple Agenda allebei begrijpen. Er is geen Google- of Apple-login nodig.
 
-- **Van de app naar jullie agenda's.** Bij Gezin staan agenda-abonnementen: één voor het hele gezin en één per gezinslid. Met een tik voeg je ze toe aan Apple Agenda of Google Agenda. Afspraken en ingeplande taken uit de app verschijnen dan in jullie eigen agenda-app. Apple ververst zo vaak als je instelt (bijvoorbeeld elke 5 minuten), Google ververst zelf, meestal een paar keer per dag.
-- **Van jullie agenda's naar de app.** Koppel per persoon een agenda via het (geheime) iCal-adres: van Google Agenda, een iCloud-agenda, de school of de sportclub. De app leest ze live en verandert er niets in. Kies "Alleen bezet" voor bijvoorbeeld een werkagenda.
+- **Naar jullie eigen agenda:** abonnementen voor het hele gezin of per persoon (bij Gezin). Met afspraken, ingeplande taken en schoolvakanties. Apple ververst zo vaak als je instelt; Google zelf, meestal een paar keer per dag.
+- **Naar de app:** koppel agenda's via hun iCal-adres: Google, iCloud, **Social Schools** (Agenda → Abonneren) of de sportclub. Brengen en halen leg je vast in de app, ook bij afspraken uit deze agenda's.
+- **Schoolvakanties:** per regio, uit de open data van de Rijksoverheid.
+
+## Meldingen
+
+Pushmeldingen per toestel (op de iPhone alleen als de app op het beginscherm staat): de **ochtendbriefing** (wie moet waarheen, wie brengt en haalt, wat jullie eten, wat jij niet moet vergeten), **herinneringen** voor afspraken waar je bij bent of brengt of haalt, 's avonds een seintje voor taken die nog openstaan, en desgewenst een melding als de ander iets afvinkt. De briefing en herinneringen hebben een planner nodig die de app elke 5 minuten een tik geeft (zie SETUP.md).
 
 ## Privacy
 
-- Alles staat in jullie eigen opslag (Upstash, gekoppeld aan jullie eigen Vercel-project). Er gaat niets naar een AI of naar andere partijen.
-- De app is beveiligd met een gezinswachtwoord. De agenda-abonnementen werken met een geheime code in het adres; die kun je bij Gezin vernieuwen.
-- Geheime iCal-adressen van jullie agenda's worden opgeslagen om ze te kunnen lezen, maar de app laat ze daarna niet meer volledig zien.
+- Alles staat in jullie eigen opslag (Upstash, gekoppeld aan jullie eigen Vercel-project). Er gaat niets naar een AI.
+- Beveiligd met een gezinswachtwoord. Agenda-abonnementen, de keukenstand en de inbox-Opdracht werken met een geheime code in het adres; die vernieuw je bij Gezin of Inbox.
+- De keukenstand toont het weekbord, eten en boodschappen, maar geen inzichten, kaartjes of agenda-adressen.
+- Pushmeldingen gaan via de pushdienst van Apple of Google, versleuteld.
 
 ## Ontwikkelen
 
@@ -60,10 +82,14 @@ Lokaal met wachtwoord: `GEZIN_WACHTWOORD=test npm run dev`. Gegevens staan dan i
 |---|---|
 | `src/lib/types.ts` | Het datamodel (zod-schema's) |
 | `src/lib/acties.ts` | Alle wijzigingen als één pure functie `pasToe(staat, actie)` |
-| `src/lib/herhaling.ts` | Herhalingen uitschrijven (dagelijks, wekelijks op dagen, maandelijks, jaarlijks) |
-| `src/lib/taken.ts` | Welke taken openstaan |
-| `src/lib/inzicht.ts` | De berekening van de mentale last |
-| `src/lib/agenda.ts`, `src/lib/ics/` | Agenda-items, iCal schrijven (feeds) en lezen (gekoppelde agenda's) |
-| `src/lib/opslag.ts`, `src/lib/dienst.ts` | Opslag met versiecontrole, zodat twee ouders elkaars wijzigingen niet overschrijven |
-| `src/app/api/` | API-routes |
+| `src/lib/herhaling.ts`, `taken.ts` | Herhalingen uitschrijven, welke taken openstaan |
+| `src/lib/bord.ts` | Het weekbord: per dag en per gezinslid, brengen en halen, botsingen, week doorlopen |
+| `src/lib/invoer.ts` | De invoerregel: Nederlandse tekst naar voorstellen, zonder AI |
+| `src/lib/boodschappen.ts` | Afdelingen raden, lijsten splitsen |
+| `src/lib/vakanties.ts` | Schoolvakanties (open data Rijksoverheid) |
+| `src/lib/inzicht.ts` | De berekening van de mentale last en de kaartjesronde |
+| `src/lib/meldingen.ts`, `push.ts` | Wat er wanneer gemeld wordt, en het versturen via Web Push |
+| `src/lib/agenda.ts`, `ics/` | Agenda-items, iCal schrijven (feeds) en lezen (gekoppelde agenda's) |
+| `src/lib/opslag.ts`, `dienst.ts` | Opslag met versiecontrole, zodat twee ouders elkaars wijzigingen niet overschrijven |
+| `src/app/api/` | API-routes (o.a. `klok` voor de meldingen, `inbox` voor de Opdracht, `keuken`, `feed`) |
 | `src/components/` | De schermen |

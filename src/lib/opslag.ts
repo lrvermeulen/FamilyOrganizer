@@ -11,6 +11,8 @@ export interface Opslag {
   /** Schrijf alleen als de opgeslagen versie gelijk is aan 'verwacht'. Geeft false bij een botsing. */
   zetAls(sleutel: string, verwacht: number, nieuw: number, tekst: string): Promise<boolean>;
   wis(sleutel: string): Promise<void>;
+  /** Gewoon opslaan, zonder versiecontrole (voor losse gegevens zoals push-abonnementen). */
+  zet(sleutel: string, tekst: string): Promise<void>;
 }
 
 export class GeheugenOpslag implements Opslag {
@@ -25,6 +27,9 @@ export class GeheugenOpslag implements Opslag {
   }
   async wis(k: string) {
     this.data.delete(k);
+  }
+  async zet(k: string, tekst: string) {
+    this.data.set(k, { versie: this.data.get(k)?.versie ?? 0, tekst });
   }
 }
 
@@ -57,6 +62,10 @@ export class BestandOpslag implements Opslag {
   }
   async wis(k: string) {
     await fs.rm(this.pad(k), { force: true });
+  }
+  async zet(k: string, tekst: string) {
+    await fs.mkdir(this.map, { recursive: true });
+    await fs.writeFile(this.pad(k), tekst);
   }
 }
 
@@ -92,6 +101,9 @@ export class UpstashOpslag implements Opslag {
   }
   async wis(k: string) {
     await this.cmd("DEL", k, `${k}:versie`);
+  }
+  async zet(k: string, tekst: string) {
+    await this.cmd("SET", k, tekst);
   }
 }
 

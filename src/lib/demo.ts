@@ -2,6 +2,7 @@ import type { DateTime } from "luxon";
 import { afdelingVan } from "./boodschappen";
 import { alsDatum, maandagVan, plusDagen } from "./datum";
 import { voorvallen } from "./herhaling";
+import { aandeelUitKaartjes, kaartjes } from "./inzicht";
 import { SJABLONEN } from "./sjablonen";
 import { StaatSchema, type Afspraak, type Staat, type Taak, type Voltooiing } from "./types";
 
@@ -41,6 +42,10 @@ export function demoStaat(nu: DateTime): Staat {
     "Rekeningen en post afhandelen": "bram",
     "Verjaardagen familie en vrienden: kaart of cadeau": "anna",
     "Weekend plannen (uitjes, bezoek)": null,
+    "Merken hoe het met de kinderen gaat (school, vriendjes)": "anna",
+    "Troosten en er zijn bij verdriet of boosheid": "bram",
+    "Opvoedvragen aankaarten (schermtijd, eten, slapen)": "anna",
+    "Contact met opa's, oma's en familie onderhouden": "anna",
   };
   const uitvoerderVan: Record<string, string> = {
     Koken: "bram",
@@ -132,7 +137,7 @@ export function demoStaat(nu: DateTime): Staat {
     afspraak({ id: "a5", titel: "Etentje met vrienden", datum: plusDagen(vandaag, 6), begin: "19:00", eind: "22:30", leden: ["anna", "bram"], aangemaaktDoor: "bram" }),
   ];
 
-  return StaatSchema.parse({
+  const staat = StaatSchema.parse({
     versie: 0,
     gezinsnaam: "Gezin De Boer",
     leden,
@@ -145,7 +150,7 @@ export function demoStaat(nu: DateTime): Staat {
       { id: "o2", tekst: "Cadeau voor oma's verjaardag (14 december)", door: "anna", op: `${plusDagen(vandaag, -9)}T21:00:00.000+01:00`, afgehandeld: false },
       { id: "o3", tekst: "Fietsband Fien zacht", door: "bram", op: `${plusDagen(vandaag, -4)}T08:00:00.000+01:00`, afgehandeld: true },
     ],
-    inschattingen: [{ door: "bram", ronde: 1, denkwerk: 45, uitvoeren: 50, op: `${plusDagen(vandaag, -1)}T21:00:00.000+01:00` }],
+    inschattingen: [],
     gesprekken: [],
     ronde: 1,
     feedSleutel: "demo",
@@ -172,4 +177,16 @@ export function demoStaat(nu: DateTime): Staat {
       op: `${vandaag}T08:00:00.000+01:00`,
     })),
   });
+  // Bram heeft de kaartjesronde al gedaan: hij ziet het zware denkwerk vaker als "samen".
+  staat.percepties = kaartjes(staat).map((t) => ({
+    door: "bram",
+    ronde: 1,
+    taakId: t.id,
+    antwoord: t.eigenaar === "bram" ? "ik" : t.eigenaar === "anna" ? (t.denkwerk >= 2 ? "samen" : "ander") : "weetniet",
+  }));
+  const bram = aandeelUitKaartjes(staat, "bram");
+  staat.inschattingen = [
+    { door: "bram", ronde: 1, denkwerk: bram.denkwerk ?? 50, emotioneel: bram.emotioneel ?? undefined, uitvoeren: 55, op: `${plusDagen(vandaag, -1)}T21:00:00.000+01:00` },
+  ];
+  return staat;
 }
