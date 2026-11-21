@@ -1,0 +1,17 @@
+import type { MetadataRoute } from "next";
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: "Gezinsplanner",
+    short_name: "Gezin",
+    description: "Taken, agenda en de verdeling van de mentale last in jullie gezin",
+    start_url: "/",
+    display: "standalone",
+    background_color: "#f7f5f0",
+    theme_color: "#0f766e",
+    lang: "nl",
+    icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }],
+    // Android: "Delen" vanuit WhatsApp of een andere app zet de tekst in de inbox.
+    share_target: { action: "/api/delen", method: "GET", params: { title: "title", text: "text", url: "url" } },
+  } as MetadataRoute.Manifest;
+}
