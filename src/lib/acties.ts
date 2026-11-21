@@ -206,6 +206,7 @@ export function pasToe(oud: Staat, ruweActie: unknown, ctx: Context): Staat {
           if (inGebruik) throw new ActieFout("Draag eerst de taken van deze ouder over");
         }
         Object.assign(bestaand, LidSchema.parse({ ...bestaand, ...actie.lid, kleur: actie.lid.kleur ?? bestaand.kleur }));
+        if (!bestaand.code) delete bestaand.code;
       } else {
         staat.leden.push(
           LidSchema.parse({

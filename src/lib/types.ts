@@ -14,6 +14,13 @@ export const LidSchema = z.object({
   rol: z.enum(["ouder", "kind"]),
   kleur: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   geboortejaar: z.number().int().min(1900).max(2100).optional(),
+  /** Letter(s) in de agenda, zoals "S" in "S judo". Leeg = de eerste letter van de naam. */
+  code: z
+    .string()
+    .trim()
+    .max(3)
+    .regex(/^[A-ZÀ-Ý]*$/, "Gebruik hoofdletters")
+    .optional(),
 });
 export type Lid = z.infer<typeof LidSchema>;
 
@@ -138,7 +145,8 @@ export const ExterneAgendaSchema = z.object({
   id: Id,
   naam: z.string().trim().min(1).max(60),
   url: z.string().url().max(2000),
-  lid: Id,
+  /** Van wie de agenda is; null = het hele gezin (namen en letters in de titel worden herkend). */
+  lid: Id.nullable(),
   /** Alleen "Bezet" tonen, zonder titels. */
   alleenBezet: z.boolean().default(false),
 });
