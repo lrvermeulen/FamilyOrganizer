@@ -1,8 +1,8 @@
 import type { AgendaItem } from "./agenda";
 import { bordTaken } from "./bord";
 import { minutenTussen } from "./datum";
-import { openVoorvallen, uitvoerderVan } from "./taken";
-import { MeldingInstellingSchema, type MeldingInstelling, type Staat } from "./types";
+import { openVoorvallen, uitvoerderVanKeer } from "./taken";
+import { MeldingInstellingSchema, type MeldingInstelling, type Staat, type Verzoek } from "./types";
 import { vakantieOp } from "./vakanties";
 
 export interface Melding {
@@ -50,7 +50,7 @@ export function briefing(staat: Staat, items: AgendaItem[], datum: string, lid: 
   }
   const eten = staat.maaltijden.find((m) => m.datum === datum);
   if (eten?.wat) regels.push(`🍽 ${eten.wat}${eten.kok ? ` (${eten.kok === lid ? "jij kookt" : `${naam(staat, eten.kok)} kookt`})` : ""}`);
-  const mijn = bordTaken(staat, datum, datum).filter((v) => (uitvoerderVan(v.taak) ?? v.taak.eigenaar) === lid);
+  const mijn = bordTaken(staat, datum, datum).filter((v) => uitvoerderVanKeer(staat, v) === lid);
   if (mijn.length) regels.push(`Niet vergeten: ${mijn.slice(0, 4).map((v) => v.taak.titel).join(", ")}${mijn.length > 4 ? ` en ${mijn.length - 4} meer` : ""}`);
   return {
     titel: `Goedemorgen ${naam(staat, lid) ?? ""}`.trim(),
@@ -105,7 +105,7 @@ export function teVersturen(
 
     if (ins.takenAvond && binnen(minuut(ins.takenAvondTijd))) {
       const open = openVoorvallen(staat, datum, datum).filter(
-        (v) => v.datum === datum && (uitvoerderVan(v.taak) === ouder.id || (!v.taak.uitvoerder && v.taak.eigenaar === ouder.id)),
+        (v) => v.datum === datum && uitvoerderVanKeer(staat, v) === ouder.id,
       );
       if (open.length) {
         voeg({
@@ -132,4 +132,27 @@ export function afgevinktMeldingen(staat: Staat, door: string, taakTitel: string
       tekst: taakTitel,
       url: "/#bord",
     }));
+}
+
+/** Beschrijving van een vraag, voor meldingen en de inbox: "Stijn halen bij Judo, di 24 nov 17:45". */
+export function verzoekTekst(staat: Staat, v: Verzoek, dagLabel: (d: string) => string): string {
+  const wie = v.leden.map((l) => naam(staat, l)).filter(Boolean).join(" en ");
+  const wanneer = `${dagLabel(v.datum)}${v.tijd ? ` ${v.tijd}` : ""}`;
+  if (v.soort === "taak") return `${v.titel}${v.voortaan ? " (voortaan, de hele taak)" : ` (${wanneer})`}`;
+  return `${wie ? `${wie} ` : ""}${v.soort === "brengen" ? "brengen" : "halen"}: ${v.titel}, ${wanneer}`;
+}
+
+/** Melding bij een nieuwe vraag (naar wie hem krijgt) of een antwoord (naar wie hem stelde). */
+export function verzoekMelding(staat: Staat, v: Verzoek, dagLabel: (d: string) => string): Melding {
+  const tekst = verzoekTekst(staat, v, dagLabel) + (v.bericht && v.status === "open" ? `\n"${v.bericht}"` : "");
+  if (v.status === "open") {
+    return { lid: v.aan, sleutel: `verzoek|${v.id}`, titel: `${naam(staat, v.van)} vraagt: kun jij dit doen?`, tekst, url: "/#inbox" };
+  }
+  return {
+    lid: v.van,
+    sleutel: `antwoord|${v.id}`,
+    titel: v.status === "ja" ? `${naam(staat, v.aan)} doet het ✓` : `${naam(staat, v.aan)} kan het niet`,
+    tekst,
+    url: "/#bord",
+  };
 }

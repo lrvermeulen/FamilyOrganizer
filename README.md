@@ -28,6 +28,13 @@ Installeren en online zetten: zie [SETUP.md](SETUP.md).
 | **Inzicht** | Hoe denkwerk, emotioneel werk en uitvoeren verdeeld zijn, de kaartjesronde, en hulp bij het gesprek. |
 | **Gezin** | Gezinsleden, meldingen, schoolvakanties, de keukenstand, agenda's koppelen en agenda-abonnementen. |
 
+**Samen regelen**
+- **De ander iets vragen:** bij brengen of halen ("Vraag Roos te halen") en bij een taak ("deze keer" of "voortaan", dan gaat de hele taak over). De ander krijgt een melding en antwoordt in de inbox met Ja of Nee; bij Ja past de app het zelf aan.
+- **Verzetten:** lukt een taak vandaag niet, zet hem dan naar morgen of een andere dag. Afvinken blijft bij de oorspronkelijke keer horen.
+- **Mijn dag:** op het bord zie je het hele gezin, of alleen wat bij jou hoort (plus wat nog niemand doet).
+- **Aan de slag:** bovenaan het bord de eerste stappen voor elke ouder: samen verdelen, agenda's koppelen, groep van de kinderen, meldingen, week doorlopen.
+- **Groep op school:** vul bij een kind de groep in, dan komt "groep 4" in een schoolbrief vanzelf bij het goede kind.
+
 Met de **+**-knop typ je overal snel iets in, zoals "tandarts Nine do 14:00" of "melk, kaas en appels op de lijst".
 
 ## Zonder AI

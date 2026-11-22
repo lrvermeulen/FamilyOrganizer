@@ -92,3 +92,23 @@ describe("letter instellen", async () => {
     expect(() => pasToe(s, { type: "lid.opslaan", lid: { id: "t", naam: "Tobias", rol: "kind", code: "t" } }, ctx)).toThrow();
   });
 });
+
+describe("leeftijd of geboortejaar", async () => {
+  const { geboortejaarUit } = await import("@/lib/leden");
+  it("begrijpt allebei", () => {
+    expect(geboortejaarUit("7", 2026)).toBe(2019);
+    expect(geboortejaarUit("5", 2026)).toBe(2021);
+    expect(geboortejaarUit("2019", 2026)).toBe(2019);
+    expect(geboortejaarUit("", 2026)).toBeUndefined();
+    expect(geboortejaarUit("150", 2026)).toBeUndefined();
+    expect(geboortejaarUit(undefined, 2026)).toBeUndefined();
+  });
+});
+
+describe("starttaken", async () => {
+  const { SJABLONEN } = await import("@/lib/sjablonen");
+  it("elke starttaak komt maar één keer voor", () => {
+    const titels = SJABLONEN.map((s) => s.titel);
+    expect(titels.filter((t, i) => titels.indexOf(t) !== i)).toEqual([]);
+  });
+});

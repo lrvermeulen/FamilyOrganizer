@@ -982,3 +982,17 @@ button.raster-item {
 .antwoorden .knop:nth-child(3) {
   grid-column: span 2;
 }
+
+.vraag {
+  border-top: 1px solid var(--rand);
+  padding: 10px 0;
+}
+.vraag:first-of-type {
+  border-top: 0;
+}
+.aan-de-slag {
+  border-color: var(--accent);
+}
+.aan-de-slag .vinkknop {
+  cursor: default;
+}

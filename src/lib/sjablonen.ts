@@ -32,12 +32,6 @@ export const SJABLONEN: Sjabloon[] = [
   { titel: "Koken", categorie: "eten", herhaling: d(), duurMin: 45, denkwerk: 2, standaard: true },
   { titel: "Lunch en tussendoortjes kinderen klaarmaken", categorie: "eten", herhaling: w([1, 2, 3, 4, 5]), duurMin: 15, denkwerk: 1, standaard: true },
   { titel: "Vaatwasser in- en uitruimen", categorie: "huishouden", herhaling: d(), duurMin: 15, denkwerk: 1, standaard: true },
-  // Emotioneel werk: doorlopende verantwoordelijkheden zonder vaste momenten
-  { titel: "Merken hoe het met de kinderen gaat (school, vriendjes)", categorie: "kinderen", herhaling: dl(3), duurMin: 15, denkwerk: 2, werksoort: "emotioneel", standaard: true },
-  { titel: "Troosten en er zijn bij verdriet of boosheid", categorie: "kinderen", herhaling: dl(3), duurMin: 15, denkwerk: 2, werksoort: "emotioneel", standaard: true },
-  { titel: "Opvoedvragen aankaarten (schermtijd, eten, slapen)", categorie: "kinderen", herhaling: dl(1), duurMin: 15, denkwerk: 3, werksoort: "emotioneel", standaard: true },
-  { titel: "Contact met opa's, oma's en familie onderhouden", categorie: "sociaal", herhaling: dl(1), duurMin: 20, denkwerk: 2, werksoort: "emotioneel", standaard: true },
-  { titel: "Contact met juf, meester en opvang", categorie: "school", herhaling: dl(1), duurMin: 10, denkwerk: 2, werksoort: "emotioneel" },
   // Huishouden
   { titel: "Was draaien en ophangen", categorie: "huishouden", herhaling: w([1, 4, 6]), duurMin: 30, denkwerk: 1, standaard: true },
   { titel: "Was vouwen en opruimen", categorie: "huishouden", herhaling: w([2, 7]), duurMin: 25, denkwerk: 1, standaard: true },
@@ -81,3 +75,33 @@ export const SJABLONEN: Sjabloon[] = [
   { titel: "Auto: onderhoud, APK en banden", categorie: "onderhoud", herhaling: m(6), duurMin: 60, denkwerk: 2 },
   { titel: "Klusjes in huis (lampje, kraan)", categorie: "onderhoud", herhaling: m(), duurMin: 60, denkwerk: 2 },
 ];
+
+/**
+ * Wanneer een starttaak voor het eerst aan de beurt is. Taken die elke dag of week terugkomen: gewoon vanaf vandaag.
+ * Taken die zelden terugkomen (elke paar weken, maand, kwartaal, jaar) worden over de eerste periode verspreid,
+ * zodat je op dag één niet alles tegelijk voor je kiezen krijgt. 'volgnummer' zorgt voor de spreiding.
+ */
+export function eersteKeer(h: Herhaling, vandaag: string, volgnummer: number): string {
+  const plus = (dagen: number) => {
+    const d = new Date(`${vandaag}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + dagen);
+    return d.toISOString().slice(0, 10);
+  };
+  const n = Math.max(1, h.interval);
+  switch (h.soort) {
+    case "geen":
+    case "dagelijks":
+    case "doorlopend":
+      return vandaag;
+    case "wekelijks":
+      // Elke week: vanaf vandaag. Elke N weken: verspreid over de eerste N weken.
+      return n === 1 ? vandaag : plus((volgnummer % n) * 7);
+    case "maandelijks": {
+      // Ten vroegste over een week, verspreid over de eerste periode (maximaal drie maanden).
+      const periode = Math.min(n * 30, 90);
+      return plus(7 + ((volgnummer * 11) % Math.max(1, periode - 7)));
+    }
+    case "jaarlijks":
+      return plus(14 + ((volgnummer * 37) % 120));
+  }
+}

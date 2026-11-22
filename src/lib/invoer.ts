@@ -169,6 +169,10 @@ function maakTitel(tekst: string, weg: string[]): string {
   t = t
     .replace(/\b(uiterlijk|uiterste datum|deadline|v[oó]{2}r)\b/gi, " ")
     .replace(/\b(is er|er is|zijn er|er zijn|wordt er|er wordt|hebben we|hebben jullie)\s+(een\s+)?/gi, " ")
+    // Beleefde verzoeken: "Willen jullie een lege schoenendoos meegeven?" → "lege schoenendoos meegeven"
+    .replace(/^\s*(willen|wilt|zou|zouden|kunnen|kunt|mogen|denken|denkt)\s+(jullie|u|je|julie)\s+(er\s+)?(alstublieft\s+|aub\s+|even\s+|wel\s+|nog\s+)*(aan\s+)?/i, "")
+    .replace(/\s+(meenemen|meegeven|inleveren|regelen|betalen|ondertekenen|invullen)\s*\?/i, " $1")
+    .replace(/\?+/g, "")
     .replace(/\b(niet vergeten|vergeet niet|denk aan|let op|graag)\b[:!]?/gi, " ")
     .replace(/\s+(om|op|van|tot|vanaf|a\.s\.|aanstaande|komende)\s*(?=[,.!]|$)/gi, " ")
     .replace(/^\s*(om|op|van|tot|vanaf|a\.s\.|aanstaande|komende)\s+/i, "")
@@ -244,7 +248,12 @@ export function leesTekst(tekst: string, opties: { vandaag: string; leden: Lid[]
     .map((r) => r.trim())
     .filter((r) => r.length > 2);
   if (regels.length <= 1) return [leesRegel(schoon, opties)];
-  const metDatum = regels.map((r) => leesRegel(r, opties)).filter((v) => v.datumGevonden);
+  // Wie in de hele tekst genoemd wordt ("Beste ouders van groep 4"), geldt voor voorstellen zonder eigen naam.
+  const context = vindLeden(schoon, opties.leden);
+  const metDatum = regels
+    .map((r) => leesRegel(r, opties))
+    .filter((v) => v.datumGevonden)
+    .map((v) => (v.leden.length ? v : { ...v, leden: context }));
   if (metDatum.length) return metDatum;
   // Geen datums: de hele tekst als één taak, met de eerste regel als titel.
   const v = leesRegel(regels[0], opties);

@@ -83,7 +83,9 @@ function Schil() {
     return TABS.some((t) => t.id === h) ? h : (OUD[h] ?? "bord");
   });
   const [blad, zetBlad] = useState<null | { soort: "snel" } | { soort: "taak" } | { soort: "afspraak"; id?: string; datum?: string }>(null);
-  const inbox = staat.opgemerkt.filter((o) => !o.afgehandeld).length;
+  const { ik } = useGezin();
+  const inbox =
+    staat.opgemerkt.filter((o) => !o.afgehandeld).length + staat.verzoeken.filter((v) => v.aan === ik && v.status === "open").length;
 
   const naarTab = (t: string) => {
     zetTab(t);

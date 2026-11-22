@@ -14,6 +14,8 @@ export const LidSchema = z.object({
   rol: z.enum(["ouder", "kind"]),
   kleur: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   geboortejaar: z.number().int().min(1900).max(2100).optional(),
+  /** Groep op school, zoals "4" of "1/2", zodat "groep 4" in een schoolbrief bij dit kind komt. */
+  groep: z.string().trim().max(10).optional(),
   /** Letter(s) in de agenda, zoals "S" in "S judo". Leeg = de eerste letter van de naam. */
   code: z
     .string()
@@ -244,6 +246,47 @@ export const MeldingInstellingSchema = z.object({
 });
 export type MeldingInstelling = z.infer<typeof MeldingInstellingSchema>;
 
+/** Eén keer van een herhalende taak naar een andere dag. */
+export const VerzettingSchema = z.object({
+  taakId: Id,
+  /** De oorspronkelijke dag (daarop blijft het afvinken staan). */
+  origineel: Datum,
+  naar: Datum,
+});
+export type Verzetting = z.infer<typeof VerzettingSchema>;
+
+/** Wie één bepaalde keer van een taak uitvoert (na een verzoek "kun jij dit deze keer doen?"). */
+export const ToewijzingSchema = z.object({
+  taakId: Id,
+  origineel: Datum,
+  lid: Id,
+});
+export type Toewijzing = z.infer<typeof ToewijzingSchema>;
+
+/** Een vraag aan de andere ouder: "Kun jij Stijn halen?", "Kun jij dit deze keer doen?" */
+export const VerzoekSchema = z.object({
+  id: Id,
+  van: Id,
+  aan: Id,
+  soort: z.enum(["brengen", "halen", "taak"]),
+  titel: z.string().max(200),
+  datum: Datum,
+  tijd: Klok.optional(),
+  /** Bij brengen/halen: de afspraak in de app (afspraakId) of uit een gekoppelde agenda (regelSleutel). */
+  afspraakId: Id.optional(),
+  regelSleutel: z.string().max(600).optional(),
+  leden: z.array(Id).default([]),
+  /** Bij een taak: welke taak en welke keer, en of het voortaan is (de hele taak overnemen). */
+  taakId: Id.optional(),
+  origineel: Datum.optional(),
+  voortaan: z.boolean().default(false),
+  bericht: z.string().max(300).default(""),
+  status: z.enum(["open", "ja", "nee", "ingetrokken"]),
+  op: z.string(),
+  antwoordOp: z.string().optional(),
+});
+export type Verzoek = z.infer<typeof VerzoekSchema>;
+
 export const REGIOS = { noord: "Noord", midden: "Midden", zuid: "Zuid" } as const;
 export type Regio = keyof typeof REGIOS;
 
@@ -271,6 +314,9 @@ export const StaatSchema = z.object({
   maaltijden: z.array(MaaltijdSchema).default([]),
   boodschappen: z.array(BoodschapSchema).default([]),
   meldingen: z.array(MeldingInstellingSchema).default([]),
+  verzettingen: z.array(VerzettingSchema).default([]),
+  toewijzingen: z.array(ToewijzingSchema).default([]),
+  verzoeken: z.array(VerzoekSchema).default([]),
   /** Regio voor de schoolvakanties; null = niet tonen. */
   regio: z.enum(["noord", "midden", "zuid"]).nullable().default(null),
 });

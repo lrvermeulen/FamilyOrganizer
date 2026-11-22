@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { KLEUREN, REGIOS, type ExterneAgenda, type Lid, type Regio } from "@/lib/types";
-import { codeVan } from "@/lib/leden";
+import { codeVan, geboortejaarUit } from "@/lib/leden";
 import { post, useGezin } from "./context";
 import { Meldingen } from "./Meldingen";
 import { Blad, Bolletje, Keuzes } from "./ui";
@@ -17,7 +17,7 @@ function LidBlad({ lid, sluit }: { lid?: Lid; sluit: () => void }) {
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          if (await doe({ type: "lid.opslaan", lid: { id: lid?.id, naam: l.naam ?? "", rol: l.rol ?? "kind", kleur: l.kleur, geboortejaar: l.geboortejaar, code: l.code ?? "" } })) sluit();
+          if (await doe({ type: "lid.opslaan", lid: { id: lid?.id, naam: l.naam ?? "", rol: l.rol ?? "kind", kleur: l.kleur, geboortejaar: l.geboortejaar, code: l.code ?? "", groep: l.rol === "kind" ? (l.groep ?? "") : "" } })) sluit();
         }}
       >
         <label className="veld">
@@ -37,16 +37,34 @@ function LidBlad({ lid, sluit }: { lid?: Lid; sluit: () => void }) {
           />
         </div>
         {l.rol === "kind" && (
+          <>
           <label className="veld">
-            <span>Geboortejaar (optioneel)</span>
+            <span>Groep op school (optioneel)</span>
+            <input
+              type="text"
+              maxLength={10}
+              value={l.groep ?? ""}
+              placeholder="4"
+              onChange={(e) => zet({ ...l, groep: e.target.value || undefined })}
+              style={{ width: 96 }}
+            />
+            <span className="stil klein" style={{ display: "block", marginTop: 4 }}>
+              Dan komt &quot;groep {l.groep || "4"}&quot; in een schoolbrief bij {l.naam || "dit kind"}.
+            </span>
+          </label>
+          <label className="veld">
+            <span>Leeftijd (optioneel)</span>
             <input
               type="number"
-              min={1990}
-              max={2100}
-              value={l.geboortejaar ?? ""}
-              onChange={(e) => zet({ ...l, geboortejaar: e.target.value ? Number(e.target.value) : undefined })}
+              inputMode="numeric"
+              min={0}
+              max={40}
+              value={l.geboortejaar ? new Date().getFullYear() - l.geboortejaar : ""}
+              onChange={(e) => zet({ ...l, geboortejaar: geboortejaarUit(e.target.value, new Date().getFullYear()) })}
+              style={{ width: 96 }}
             />
           </label>
+          </>
         )}
         <label className="veld">
           <span>Letter in de agenda (optioneel)</span>
@@ -376,6 +394,7 @@ export function Gezin() {
                   {l.rol === "ouder" ? "Ouder" : "Kind"}
                   {codeVan(l, staat.leden) ? ` · letter ${codeVan(l, staat.leden)}` : ""}
                   {l.geboortejaar ? ` · ${new Date().getFullYear() - l.geboortejaar} jaar` : ""}
+                  {l.groep ? ` · groep ${l.groep}` : ""}
                 </div>
               </button>
             </li>

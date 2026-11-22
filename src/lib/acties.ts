@@ -67,6 +67,24 @@ export const ActieSchema = z.discriminatedUnion("type", [
     duurMin: z.number().int().min(0).max(24 * 60).optional(),
   }),
   z.object({ type: z.literal("taak.overslaan"), taakId: Id, datum: Datum }),
+  z.object({ type: z.literal("taak.verzetten"), taakId: Id, origineel: Datum, naar: Datum }),
+  z.object({
+    type: z.literal("verzoek.sturen"),
+    aan: Id,
+    soort: z.enum(["brengen", "halen", "taak"]),
+    titel: z.string().trim().min(1).max(200),
+    datum: Datum,
+    tijd: Klok.optional(),
+    afspraakId: Id.optional(),
+    regelSleutel: z.string().max(600).optional(),
+    leden: z.array(Id).max(12).default([]),
+    taakId: Id.optional(),
+    origineel: Datum.optional(),
+    voortaan: z.boolean().default(false),
+    bericht: z.string().trim().max(300).default(""),
+  }),
+  z.object({ type: z.literal("verzoek.beantwoorden"), id: Id, ja: z.boolean() }),
+  z.object({ type: z.literal("verzoek.intrekken"), id: Id }),
   z.object({ type: z.literal("taak.ongedaan"), taakId: Id, datum: Datum }),
   z.object({
     type: z.literal("taak.overdragen"),
@@ -207,6 +225,7 @@ export function pasToe(oud: Staat, ruweActie: unknown, ctx: Context): Staat {
         }
         Object.assign(bestaand, LidSchema.parse({ ...bestaand, ...actie.lid, kleur: actie.lid.kleur ?? bestaand.kleur }));
         if (!bestaand.code) delete bestaand.code;
+        if (!bestaand.groep) delete bestaand.groep;
       } else {
         staat.leden.push(
           LidSchema.parse({
@@ -266,6 +285,81 @@ export function pasToe(oud: Staat, ruweActie: unknown, ctx: Context): Staat {
       });
       break;
     }
+    case "taak.verzetten": {
+      const taak = vind(staat.taken, actie.taakId, "Taak");
+      if (taak.herhaling.soort === "geen") {
+        // Een losse taak verschuift gewoon.
+        taak.start = actie.naar;
+        break;
+      }
+      staat.verzettingen = staat.verzettingen.filter((v) => !(v.taakId === taak.id && v.origineel === actie.origineel));
+      if (actie.naar !== actie.origineel) staat.verzettingen.push({ taakId: taak.id, origineel: actie.origineel, naar: actie.naar });
+      break;
+    }
+    case "verzoek.sturen": {
+      controleerLid(staat, actie.aan, true);
+      if (actie.aan === ctx.door) throw new ActieFout("Je kunt het niet aan jezelf vragen");
+      if (actie.soort === "taak") {
+        vind(staat.taken, actie.taakId ?? "", "Taak");
+        if (!actie.origineel) throw new ActieFout("Welke keer van de taak?");
+      } else if (!actie.afspraakId && !actie.regelSleutel) {
+        throw new ActieFout("Bij welke afspraak?");
+      }
+      // Een eerdere open vraag over hetzelfde vervalt.
+      for (const v of staat.verzoeken) {
+        const zelfde =
+          v.status === "open" &&
+          v.soort === actie.soort &&
+          v.datum === actie.datum &&
+          (v.afspraakId ?? v.regelSleutel ?? v.taakId) === (actie.afspraakId ?? actie.regelSleutel ?? actie.taakId);
+        if (zelfde) v.status = "ingetrokken";
+      }
+      staat.verzoeken.push({ ...actie, id: ctx.nieuwId(), van: ctx.door, status: "open", op: ctx.nu });
+      break;
+    }
+    case "verzoek.beantwoorden": {
+      const v = vind(staat.verzoeken, actie.id, "Vraag");
+      if (v.aan !== ctx.door) throw new ActieFout("Deze vraag is niet aan jou gesteld");
+      if (v.status !== "open") throw new ActieFout("Deze vraag is al beantwoord of ingetrokken");
+      v.status = actie.ja ? "ja" : "nee";
+      v.antwoordOp = ctx.nu;
+      if (!actie.ja) break;
+      if (v.soort === "taak") {
+        const taak = vind(staat.taken, v.taakId!, "Taak");
+        if (v.voortaan) {
+          // De hele taak: eraan denken, plannen en uitvoeren.
+          taak.eigenaar = v.aan;
+          taak.uitvoerder = null;
+        } else {
+          staat.toewijzingen = staat.toewijzingen.filter((t) => !(t.taakId === taak.id && t.origineel === v.origineel));
+          staat.toewijzingen.push({ taakId: taak.id, origineel: v.origineel!, lid: v.aan });
+        }
+      } else {
+        const rol = v.soort === "brengen" ? "brengt" : "haalt";
+        const afspraak = v.afspraakId ? staat.afspraken.find((a) => a.id === v.afspraakId) : undefined;
+        if (afspraak) afspraak[rol] = v.aan;
+        else if (v.regelSleutel) {
+          const r = staat.externRegelingen.find((x) => x.sleutel === v.regelSleutel);
+          if (r) r[rol] = v.aan;
+          else
+            staat.externRegelingen.push({
+              sleutel: v.regelSleutel,
+              datum: v.datum,
+              titel: v.titel,
+              leden: v.leden,
+              brengt: rol === "brengt" ? v.aan : null,
+              haalt: rol === "haalt" ? v.aan : null,
+            });
+        }
+      }
+      break;
+    }
+    case "verzoek.intrekken": {
+      const v = vind(staat.verzoeken, actie.id, "Vraag");
+      if (v.van !== ctx.door) throw new ActieFout("Alleen wie het vroeg, kan de vraag intrekken");
+      if (v.status === "open") v.status = "ingetrokken";
+      break;
+    }
     case "taak.ongedaan":
       staat.voltooiingen = staat.voltooiingen.filter((v) => !(v.taakId === actie.taakId && v.datum === actie.datum));
       break;
@@ -285,7 +379,7 @@ export function pasToe(oud: Staat, ruweActie: unknown, ctx: Context): Staat {
       const bestaand = a.id ? staat.afspraken.find((x) => x.id === a.id) : undefined;
       const afspraak = AfspraakSchema.parse({
         ...a,
-        id: bestaand?.id ?? ctx.nieuwId(),
+        id: bestaand?.id ?? a.id ?? ctx.nieuwId(),
         aangemaaktDoor: bestaand?.aangemaaktDoor ?? ctx.door,
         aangemaaktOp: bestaand?.aangemaaktOp ?? ctx.nu,
       });

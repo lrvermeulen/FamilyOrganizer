@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { vandaag } from "@/lib/datum";
-import { SJABLONEN } from "@/lib/sjablonen";
+import { geboortejaarUit } from "@/lib/leden";
+import { eersteKeer, SJABLONEN } from "@/lib/sjablonen";
 import { CATEGORIEEN, KLEUREN, type Categorie } from "@/lib/types";
 import { post } from "./context";
 
@@ -10,7 +11,8 @@ interface Rij {
   id: string;
   naam: string;
   rol: "ouder" | "kind";
-  geboortejaar?: number;
+  /** Zoals ingevuld: een leeftijd (7) of een geboortejaar (2019). */
+  leeftijd?: string;
 }
 
 const nieuwId = () => crypto.randomUUID().replace(/-/g, "").slice(0, 12);
@@ -44,12 +46,13 @@ export function Start({ klaar }: { klaar: () => void }) {
         actie: {
           type: "gezin.instellen",
           gezinsnaam,
-          leden: ingevuld.map((l, i) => ({ id: l.id, naam: l.naam.trim(), rol: l.rol, geboortejaar: l.geboortejaar, kleur: KLEUREN[i % KLEUREN.length] })),
-          taken: SJABLONEN.filter((s) => taken.has(s.titel)).map((s) => ({
+          leden: ingevuld.map((l, i) => ({ id: l.id, naam: l.naam.trim(), rol: l.rol, geboortejaar: geboortejaarUit(l.leeftijd, new Date().getFullYear()), kleur: KLEUREN[i % KLEUREN.length] })),
+          taken: SJABLONEN.filter((s) => taken.has(s.titel)).map((s, i) => ({
             titel: s.titel,
             categorie: s.categorie,
             notitie: s.denkwerkUitleg ?? "",
-            start,
+            start: eersteKeer(s.herhaling, start, i),
+            werksoort: s.werksoort ?? "denkwerk",
             herhaling: s.herhaling,
             duurMin: s.duurMin,
             denkwerk: s.denkwerk,
@@ -91,13 +94,14 @@ export function Start({ klaar }: { klaar: () => void }) {
               {l.rol === "kind" && (
                 <input
                   type="number"
-                  placeholder="Jaar"
-                  aria-label="Geboortejaar"
-                  min={1990}
+                  inputMode="numeric"
+                  placeholder="Leeftijd"
+                  aria-label="Leeftijd"
+                  min={0}
                   max={2100}
-                  value={l.geboortejaar ?? ""}
-                  onChange={(e) => wijzig(l.id, { geboortejaar: e.target.value ? Number(e.target.value) : undefined })}
-                  style={{ width: 84, flex: "none" }}
+                  value={l.leeftijd ?? ""}
+                  onChange={(e) => wijzig(l.id, { leeftijd: e.target.value })}
+                  style={{ width: 96, flex: "none" }}
                 />
               )}
             </div>

@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { AgendaItem } from "@/lib/agenda";
+import { betreft, type AgendaItem } from "@/lib/agenda";
 import { alleItems, bordDag, brengHaalNodig, weekstart, weekVoorWeekstart } from "@/lib/bord";
 import { dag, kortLabel, langLabel, maandagVan, plusDagen, vandaag as vandaagDatum, WEEKDAG_KORT, WEEKDAG_LANG } from "@/lib/datum";
-import { openVoorvallen, type Voorval } from "@/lib/taken";
+import { openVoorvallen, uitvoerderVanKeer, type Voorval } from "@/lib/taken";
 import type { Staat, Taak } from "@/lib/types";
 import { vakantieOp } from "@/lib/vakanties";
 import { Agenda } from "./Agenda";
@@ -12,7 +12,8 @@ import { useGezin } from "./context";
 import { TaakFormulier } from "./Formulieren";
 import { MaaltijdBlad } from "./Lijsten";
 import { useExtern } from "./useExtern";
-import { ItemRegel, TaakRegel, VoorvalBlad } from "./Regels";
+import { AanDeSlag } from "./AanDeSlag";
+import { ItemRegel, TaakRegel, VoorvalBlad, VraagKnop } from "./Regels";
 import { Blad, Bolletje, Keuzes } from "./ui";
 
 function naam(staat: Staat, id: string | null | undefined) {
@@ -165,6 +166,30 @@ function RitBlad({ item, sluit }: { item: AgendaItem; sluit: () => void }) {
           Opslaan
         </button>
       </div>
+      <div className="stapel" style={{ marginTop: 14 }}>
+        <div className="veld-label">Of vraag het de ander</div>
+        <div className="rij">
+          {(["brengen", "halen"] as const).map((rol) => (
+            <VraagKnop
+              key={rol}
+              label={(n) => `Vraag ${n} te ${rol}`}
+              klaar={sluit}
+              maak={(aan, bericht) => ({
+                type: "verzoek.sturen",
+                aan,
+                soort: rol,
+                titel: item.titel,
+                datum: item.datum,
+                tijd: rol === "brengen" ? item.begin : (item.eind ?? item.begin),
+                afspraakId: afspraak?.id,
+                regelSleutel: afspraak ? undefined : (item.regelSleutel ?? item.sleutel),
+                leden: item.leden,
+                bericht,
+              })}
+            />
+          ))}
+        </div>
+      </div>
     </Blad>
   );
 }
@@ -187,6 +212,7 @@ function DagWeergave({
   openRit,
   openEten,
   openTaak,
+  alleenVan,
 }: {
   datum: string;
   items: AgendaItem[];
@@ -194,12 +220,22 @@ function DagWeergave({
   openRit: (i: AgendaItem) => void;
   openEten: (d: string) => void;
   openTaak: (v: Voorval) => void;
+  /** Alleen wat met deze ouder te maken heeft (plus wat nog niemand doet). */
+  alleenVan: string | null;
 }) {
   const { staat, lid } = useGezin();
   const vandaag = vandaagDatum();
-  const b = bordDag(staat, items, datum, vandaag);
+  const volledig = bordDag(staat, items, datum, vandaag);
+  const mijnItem = (i: AgendaItem) =>
+    !alleenVan || betreft(i, alleenVan) || (brengHaalNodig(i, staat) && (!i.brengt || !i.haalt));
+  const mijnTaak = (v: Voorval) => !alleenVan || uitvoerderVanKeer(staat, v) === alleenVan || !v.taak.eigenaar;
+  const b = {
+    ...volledig,
+    perLid: Object.fromEntries(Object.entries(volledig.perLid).map(([k, lijst]) => [k, lijst.filter(mijnItem)])),
+    taken: volledig.taken.filter(mijnTaak),
+  };
   const routines = openVoorvallen(staat, vandaag, datum > vandaag ? datum : vandaag).filter(
-    (v) => v.taak.herhaling.soort === "dagelijks" && v.datum === datum,
+    (v) => v.taak.herhaling.soort === "dagelijks" && v.datum === datum && mijnTaak(v),
   );
   const metIets = staat.leden.filter((l) => b.perLid[l.id].length > 0);
   const heleGezin = items.filter((i) => i.datum === datum && i.soort !== "taak" && i.leden.length === 0);
@@ -267,11 +303,17 @@ function WeekstartBlad({ sluit, naarTab }: { sluit: () => void; naarTab: (t: str
   const maandag = weekVoorWeekstart(vandaagDatum());
   const extern = useExtern(maandag, plusDagen(maandag, 6));
   const items = useMemo(() => alleItems(staat, extern.items, maandag, plusDagen(maandag, 6)), [staat, extern.items, maandag]);
-  const w = weekstart(staat, items, maandag);
+  const w = weekstart(staat, items, maandag, vandaagDatum());
+  const { ouders, doe, bezig } = useGezin();
+  useEffect(() => {
+    try {
+      localStorage.setItem("weekstart-gedaan", "1");
+    } catch {}
+  }, []);
   const [rit, zetRit] = useState<AgendaItem | null>(null);
   const [eten, zetEten] = useState<string | null>(null);
   const klaar =
-    !w.openRitten.length && !w.botsingen.length && !w.dagenZonderEten.length && !w.takenZonderEigenaar && !w.inbox;
+    !w.teDoen.some((v) => !v.taak.eigenaar) && !w.openRitten.length && !w.botsingen.length && !w.dagenZonderEten.length && !w.takenZonderEigenaar && !w.inbox;
 
   return (
     <Blad titel={`Week ${dag(maandag).weekNumber} doorlopen`} sluit={sluit}>
@@ -298,6 +340,42 @@ function WeekstartBlad({ sluit, naarTab }: { sluit: () => void; naarTab: (t: str
           </ul>
         </div>
       )}
+
+      <div className="kaart">
+        <h3>Deze week af {w.teDoen.length ? <span className="label let">{w.teDoen.length}</span> : "✓"}</h3>
+        {w.teDoen.length === 0 ? (
+          <p className="stil klein">Geen losse taken of deadlines deze week, behalve de vaste routine.</p>
+        ) : (
+          <ul className="lijst">
+            {w.teDoen.map((v) => (
+              <li key={`${v.taak.id}-${v.origineel}`} style={{ display: "block" }}>
+                <div className="titel">
+                  <b>{v.taak.titel}</b>
+                </div>
+                <div className="meta">
+                  {v.datum < vandaagDatum() ? `was ${kortLabel(v.datum)}` : `${v.taak.herhaling.soort === "geen" && v.taak.inAgenda ? "uiterlijk " : ""}${kortLabel(v.datum)}`}
+                  {v.taak.eigenaar ? ` · ${lid(v.taak.eigenaar)?.naam}` : ""}
+                </div>
+                {!v.taak.eigenaar && (
+                  <div className="rij" style={{ marginTop: 6 }}>
+                    <span className="stil klein">Wie pakt het op?</span>
+                    {ouders.map((o) => (
+                      <button
+                        key={o.id}
+                        className="chip"
+                        disabled={bezig}
+                        onClick={() => doe({ type: "taak.overdragen", taakId: v.taak.id, naar: o.id, heelPakket: true })}
+                      >
+                        {o.naam}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="kaart">
         <h3>Brengen en halen {w.openRitten.length ? <span className="label let">{w.openRitten.length} open</span> : "✓"}</h3>
@@ -384,6 +462,19 @@ export function Bord({ naarTab, bewerkAfspraak, nieuweAfspraak }: { naarTab: (t:
   const [voorval, zetVoorval] = useState<Voorval | null>(null);
   const [bewerk, zetBewerk] = useState<Taak | null>(null);
   const [weekstartOpen, zetWeekstart] = useState(false);
+  const { ik } = useGezin();
+  const [alleenIk, zetAlleenIk] = useState(false);
+  useEffect(() => {
+    try {
+      zetAlleenIk(localStorage.getItem("bord-alleen-ik") === "1");
+    } catch {}
+  }, []);
+  const kiesAlleenIk = (x: boolean) => {
+    zetAlleenIk(x);
+    try {
+      localStorage.setItem("bord-alleen-ik", x ? "1" : "0");
+    } catch {}
+  };
 
   useEffect(() => {
     // Op een groot scherm (tablet, laptop) begint het bord met de hele week.
@@ -415,6 +506,8 @@ export function Bord({ naarTab, bewerkAfspraak, nieuweAfspraak }: { naarTab: (t:
           Week doorlopen
         </button>
       </div>
+
+      <AanDeSlag naarTab={naarTab} weekstart={() => zetWeekstart(true)} />
 
       <div className="rij tussen" style={{ marginBottom: 12 }}>
         <Keuzes
@@ -460,7 +553,26 @@ export function Bord({ naarTab, bewerkAfspraak, nieuweAfspraak }: { naarTab: (t:
               volgende week ›
             </button>
           </div>
-          <DagWeergave datum={datum} items={items} openItem={openItem} openRit={zetRit} openEten={zetEten} openTaak={zetVoorval} />
+          <div style={{ marginBottom: 10 }}>
+            <Keuzes
+              label="Wat laten zien"
+              waarde={alleenIk}
+              kies={kiesAlleenIk}
+              opties={[
+                { waarde: false, label: "Hele gezin" },
+                { waarde: true, label: "Mijn dag" },
+              ]}
+            />
+          </div>
+          <DagWeergave
+            datum={datum}
+            items={items}
+            openItem={openItem}
+            openRit={zetRit}
+            openEten={zetEten}
+            openTaak={zetVoorval}
+            alleenVan={alleenIk ? ik : null}
+          />
           <button className="knop vol" onClick={() => nieuweAfspraak(datum)}>
             + Afspraak op {kortLabel(datum)}
           </button>
