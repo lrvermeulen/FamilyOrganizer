@@ -1,6 +1,6 @@
 import { appItems, betreft, metRegelingen, overlapt, sorteer, type AgendaItem } from "./agenda";
 import { maandagVan, plusDagen } from "./datum";
-import { openVoorvallen, uitvoerderVan, type Voorval } from "./taken";
+import { openVoorvallen, uitvoerderVanKeer, type Voorval } from "./taken";
 import type { Maaltijd, Staat } from "./types";
 import { vakantieOp, type Vakantie } from "./vakanties";
 
@@ -46,7 +46,7 @@ export function bordDag(staat: Staat, items: AgendaItem[], datum: string, vandaa
   for (const i of vanDag) for (const l of staat.leden) if (i.leden.includes(l.id)) perLid[l.id].push(i);
   const taken = bordTaken(staat, datum, vandaag);
   const takenPerLid: Record<string, Voorval[]> = { "": [], ...Object.fromEntries(staat.leden.map((l) => [l.id, []])) };
-  for (const v of taken) (takenPerLid[uitvoerderVan(v.taak) ?? ""] ?? takenPerLid[""]).push(v);
+  for (const v of taken) (takenPerLid[uitvoerderVanKeer(staat, v) ?? ""] ?? takenPerLid[""]).push(v);
   return {
     datum,
     vakantie: vakantieOp(staat.regio, datum),
@@ -85,6 +85,8 @@ export function weekVoorWeekstart(vandaag: string): string {
 
 export interface Weekstart {
   maandag: string;
+  /** Wat deze week af moet en geen routine is: losse taken, deadlines en taken die zelden terugkomen. */
+  teDoen: Voorval[];
   openRitten: AgendaItem[];
   botsingen: AgendaItem[];
   dagenZonderEten: string[];
@@ -95,8 +97,17 @@ export interface Weekstart {
   bijzondereDagen: AgendaItem[];
 }
 
-export function weekstart(staat: Staat, items: AgendaItem[], maandag: string): Weekstart {
+/** Komt een taak zo vaak terug dat hij vanzelf loopt (elke dag of elke week)? */
+export function isRoutine(v: Voorval): boolean {
+  const h = v.taak.herhaling;
+  return h.soort === "dagelijks" || (h.soort === "wekelijks" && h.interval === 1);
+}
+
+export function weekstart(staat: Staat, items: AgendaItem[], maandag: string, vandaag: string = maandag): Weekstart {
   const dagen = Array.from({ length: 7 }, (_, i) => plusDagen(maandag, i));
+  const teDoen = openVoorvallen(staat, vandaag < maandag ? vandaag : maandag, dagen[6]).filter(
+    (v) => !isRoutine(v) && v.datum <= dagen[6] && (v.datum >= maandag || v.taak.herhaling.soort === "geen" || v.datum >= vandaag),
+  );
   const week = items.filter((i) => i.datum >= maandag && i.datum <= dagen[6] && i.soort !== "taak");
   const bots = botsingen(week);
   const kind = (id: string) => staat.leden.find((l) => l.id === id)?.rol === "kind";
@@ -107,6 +118,7 @@ export function weekstart(staat: Staat, items: AgendaItem[], maandag: string): W
   }
   return {
     maandag,
+    teDoen,
     openRitten: week.filter((i) => brengHaalNodig(i, staat) && (!i.brengt || !i.haalt)),
     botsingen: week.filter((i) => bots.has(i.sleutel)),
     dagenZonderEten: dagen.filter((d) => !staat.maaltijden.some((m) => m.datum === d && m.wat)),

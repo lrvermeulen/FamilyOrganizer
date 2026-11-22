@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { urenLabel, vandaag as vandaagDatum } from "@/lib/datum";
 import { herhalingLabel, perWeek } from "@/lib/herhaling";
 import { structureleVerdeling } from "@/lib/inzicht";
-import { SJABLONEN } from "@/lib/sjablonen";
+import { eersteKeer, SJABLONEN } from "@/lib/sjablonen";
 import { uitvoerderVan } from "@/lib/taken";
 import { CATEGORIEEN, type Categorie, type Taak } from "@/lib/types";
 import { useGezin } from "./context";
@@ -20,11 +20,12 @@ export function StartTakenBlad({ sluit }: { sluit: () => void }) {
     const vandaag = vandaagDatum();
     const taken = beschikbaar
       .filter((x) => gekozen.has(x.titel))
-      .map((s) => ({
+      .map((s, i) => ({
         titel: s.titel,
         categorie: s.categorie,
         notitie: s.denkwerkUitleg ?? "",
-        start: vandaag,
+        start: eersteKeer(s.herhaling, vandaag, i),
+        werksoort: s.werksoort ?? "denkwerk",
         herhaling: s.herhaling,
         duurMin: s.duurMin,
         denkwerk: s.denkwerk,

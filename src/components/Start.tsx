@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { vandaag } from "@/lib/datum";
 import { geboortejaarUit } from "@/lib/leden";
-import { SJABLONEN } from "@/lib/sjablonen";
+import { eersteKeer, SJABLONEN } from "@/lib/sjablonen";
 import { CATEGORIEEN, KLEUREN, type Categorie } from "@/lib/types";
 import { post } from "./context";
 
@@ -47,11 +47,12 @@ export function Start({ klaar }: { klaar: () => void }) {
           type: "gezin.instellen",
           gezinsnaam,
           leden: ingevuld.map((l, i) => ({ id: l.id, naam: l.naam.trim(), rol: l.rol, geboortejaar: geboortejaarUit(l.leeftijd, new Date().getFullYear()), kleur: KLEUREN[i % KLEUREN.length] })),
-          taken: SJABLONEN.filter((s) => taken.has(s.titel)).map((s) => ({
+          taken: SJABLONEN.filter((s) => taken.has(s.titel)).map((s, i) => ({
             titel: s.titel,
             categorie: s.categorie,
             notitie: s.denkwerkUitleg ?? "",
-            start,
+            start: eersteKeer(s.herhaling, start, i),
+            werksoort: s.werksoort ?? "denkwerk",
             herhaling: s.herhaling,
             duurMin: s.duurMin,
             denkwerk: s.denkwerk,

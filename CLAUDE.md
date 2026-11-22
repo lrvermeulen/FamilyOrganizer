@@ -17,6 +17,8 @@ De app is in het Nederlands: teksten, code (namen van functies en variabelen), c
 - **Kaartjesronde:** antwoorden per taak (`percepties`) blijven verborgen tot beide ouders klaar zijn (een inschatting hebben opgeslagen). Toon nooit de antwoorden van de ander eerder.
 - **Zonder AI.** De invoerregel en inbox (`src/lib/invoer.ts`) werken met vaste regels; tekst uit screenshots wordt in de browser gelezen (tesseract.js). Voeg geen AI toe zonder dat de gebruiker erom vraagt, en dan alleen als optie die standaard uit staat.
 - **Letters in de agenda:** het gezin gebruikt letters vooraan in agenda-titels ("S judo" = Stijn, T = Tobias, L = Laurens, R = Roos). `herkenLeden` in `src/lib/leden.ts` herkent die en namen, voor gekoppelde agenda's (ook een gezinsagenda met `lid: null`) en de invoerregel.
+- **Eén keer van een taak:** `Voorval.datum` is de dag waarop hij nu staat, `Voorval.origineel` de oorspronkelijke dag. Afvinken, overslaan, verzetten (`verzettingen`) en toewijzen (`toewijzingen`) gaan altijd op `origineel`. Wie een keer uitvoert: `uitvoerderVanKeer`.
+- **Vragen (`verzoeken`):** alleen wie de vraag krijgt, kan antwoorden; bij Ja past `pasToe` brengen/halen of de taak zelf aan. "Voortaan" draagt de hele taak over (eigenaar én uitvoerder), "deze keer" alleen die keer.
 - **Brengen en halen** horen bij afspraken, ook uit gekoppelde agenda's (`externRegelingen`, gekoppeld via `regelSleutel`).
 - **Agenda via iCal.** De app schrijft feeds (`/api/feed/<sleutel>/<gezin|lid-id>.ics`) en leest gekoppelde agenda's via hun iCal-adres. Geen Google- of Apple-login nodig.
 - **Privacy.** Er gaat niets naar een AI. Pushmeldingen gaan versleuteld via de pushdienst van Apple of Google; verder geen andere partijen. Geheime iCal-adressen gaan nooit volledig naar de browser (`publiek()` in `src/lib/api.ts`). De demo gebruikt een eigen sleutel in de opslag en raakt nooit echte gegevens.
@@ -33,6 +35,9 @@ De app is in het Nederlands: teksten, code (namen van functies en variabelen), c
 `npm test`, `npm run typecheck`, `npm run dev`. Draai na wijzigingen de tests en de typecheck, en klik voor schermwijzigingen de app door.
 
 ## Ideeën voor later
+- Een overzicht van wat de ander deed ("Roos heeft judo-halen op zich genomen")
+- Ziek of afgezegd: welke afspraken vervallen, wie blijft thuis
+- Een reservekopie (alles downloaden)
 - **Picnic:** de boodschappenlijst met één knop in het Picnic-mandje. Er is geen officiële koppeling; alleen een onofficiële (eigen risico, kan stoppen, mogelijk tegen de voorwaarden). Gebruiker koos: eerst zonder, later beslissen.
 - Google Agenda direct beschrijven via de API (sneller dan het abonnement, dat Google maar een paar keer per dag ververst)
 - Taken voor de kinderen zelf, met een eenvoudige kinderweergave op de keukentablet

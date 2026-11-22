@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { fout, foutBericht, publiek, sessieVan } from "@/lib/api";
 import { laadStaat, voerUit } from "@/lib/dienst";
-import { afgevinktMeldingen } from "@/lib/meldingen";
+import { kortLabel } from "@/lib/datum";
+import { afgevinktMeldingen, verzoekMelding } from "@/lib/meldingen";
 import { abonnementen, verstuur } from "@/lib/push";
 import { cookieOpties, maakSessie, SESSIE_COOKIE } from "@/lib/sessie";
 
@@ -26,6 +27,16 @@ export async function POST(req: NextRequest) {
         if (titel) await verstuur(afgevinktMeldingen(staat, door, titel, metAbo));
       } catch (e) {
         console.error("Melding afvinken", e);
+      }
+    }
+    if (body.actie.type === "verzoek.sturen" || body.actie.type === "verzoek.beantwoorden") {
+      // Een vraag of antwoord meteen doorgeven aan de ander.
+      try {
+        const id = body.actie.type === "verzoek.beantwoorden" ? (body.actie as { id?: string }).id : undefined;
+        const v = id ? staat.verzoeken.find((x) => x.id === id) : staat.verzoeken.at(-1);
+        if (v) await verstuur([verzoekMelding(staat, v, kortLabel)]);
+      } catch (e) {
+        console.error("Melding vraag", e);
       }
     }
     const res = NextResponse.json({ staat: publiek(staat) });

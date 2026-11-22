@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { kortLabel } from "@/lib/datum";
+import { verzoekTekst } from "@/lib/meldingen";
 import { useGezin } from "./context";
 import { Invoerregel } from "./Invoer";
 import { Bolletje } from "./ui";
@@ -55,6 +56,51 @@ function VanafTelefoon() {
   );
 }
 
+function Vragen() {
+  const { staat, ik, lid, doe, bezig } = useGezin();
+  const aanMij = staat.verzoeken.filter((v) => v.aan === ik && v.status === "open");
+  const vanMij = staat.verzoeken.filter((v) => v.van === ik && v.status === "open");
+  const week = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const beantwoord = staat.verzoeken.filter((v) => v.van === ik && (v.status === "ja" || v.status === "nee") && (v.antwoordOp ?? "") > week);
+  if (!aanMij.length && !vanMij.length && !beantwoord.length) return null;
+  return (
+    <div className="kaart">
+      <h3>Vragen</h3>
+      {aanMij.map((v) => (
+        <div key={v.id} className="vraag">
+          <div className="klein stil">{lid(v.van)?.naam} vraagt:</div>
+          <div>
+            <b>{verzoekTekst(staat, v, kortLabel)}</b>
+          </div>
+          {v.bericht && <div className="klein">&quot;{v.bericht}&quot;</div>}
+          <div className="rij" style={{ marginTop: 8 }}>
+            <button className="knop hoofd klein" disabled={bezig} onClick={() => doe({ type: "verzoek.beantwoorden", id: v.id, ja: true })}>
+              Ja, doe ik
+            </button>
+            <button className="knop klein" disabled={bezig} onClick={() => doe({ type: "verzoek.beantwoorden", id: v.id, ja: false })}>
+              Lukt niet
+            </button>
+          </div>
+        </div>
+      ))}
+      {vanMij.map((v) => (
+        <div key={v.id} className="vraag">
+          <div className="klein stil">Jij vroeg {lid(v.aan)?.naam}, nog geen antwoord:</div>
+          <div>{verzoekTekst(staat, v, kortLabel)}</div>
+          <button className="knop stil klein" disabled={bezig} onClick={() => doe({ type: "verzoek.intrekken", id: v.id })}>
+            Intrekken
+          </button>
+        </div>
+      ))}
+      {beantwoord.map((v) => (
+        <div key={v.id} className="vraag klein">
+          {v.status === "ja" ? "✓" : "✗"} {lid(v.aan)?.naam} {v.status === "ja" ? "doet" : "kan niet"}: {verzoekTekst(staat, v, kortLabel)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Inbox() {
   const { staat, lid, doe, bezig } = useGezin();
   const [verwerk, zetVerwerk] = useState<{ id: string; tekst: string; bron: "zelf" | "plakken" | "foto" | "delen" } | null>(null);
@@ -68,6 +114,8 @@ export function Inbox() {
           <div className="sub">Alles wat binnenkomt, op één plek</div>
         </div>
       </div>
+
+      <Vragen />
 
       <div className="kaart">
         <Invoerregel

@@ -17,7 +17,7 @@ function LidBlad({ lid, sluit }: { lid?: Lid; sluit: () => void }) {
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          if (await doe({ type: "lid.opslaan", lid: { id: lid?.id, naam: l.naam ?? "", rol: l.rol ?? "kind", kleur: l.kleur, geboortejaar: l.geboortejaar, code: l.code ?? "" } })) sluit();
+          if (await doe({ type: "lid.opslaan", lid: { id: lid?.id, naam: l.naam ?? "", rol: l.rol ?? "kind", kleur: l.kleur, geboortejaar: l.geboortejaar, code: l.code ?? "", groep: l.rol === "kind" ? (l.groep ?? "") : "" } })) sluit();
         }}
       >
         <label className="veld">
@@ -37,6 +37,21 @@ function LidBlad({ lid, sluit }: { lid?: Lid; sluit: () => void }) {
           />
         </div>
         {l.rol === "kind" && (
+          <>
+          <label className="veld">
+            <span>Groep op school (optioneel)</span>
+            <input
+              type="text"
+              maxLength={10}
+              value={l.groep ?? ""}
+              placeholder="4"
+              onChange={(e) => zet({ ...l, groep: e.target.value || undefined })}
+              style={{ width: 96 }}
+            />
+            <span className="stil klein" style={{ display: "block", marginTop: 4 }}>
+              Dan komt &quot;groep {l.groep || "4"}&quot; in een schoolbrief bij {l.naam || "dit kind"}.
+            </span>
+          </label>
           <label className="veld">
             <span>Leeftijd (optioneel)</span>
             <input
@@ -49,6 +64,7 @@ function LidBlad({ lid, sluit }: { lid?: Lid; sluit: () => void }) {
               style={{ width: 96 }}
             />
           </label>
+          </>
         )}
         <label className="veld">
           <span>Letter in de agenda (optioneel)</span>
@@ -378,6 +394,7 @@ export function Gezin() {
                   {l.rol === "ouder" ? "Ouder" : "Kind"}
                   {codeVan(l, staat.leden) ? ` · letter ${codeVan(l, staat.leden)}` : ""}
                   {l.geboortejaar ? ` · ${new Date().getFullYear() - l.geboortejaar} jaar` : ""}
+                  {l.groep ? ` · groep ${l.groep}` : ""}
                 </div>
               </button>
             </li>
