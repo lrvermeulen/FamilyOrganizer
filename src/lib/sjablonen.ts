@@ -32,12 +32,6 @@ export const SJABLONEN: Sjabloon[] = [
   { titel: "Koken", categorie: "eten", herhaling: d(), duurMin: 45, denkwerk: 2, standaard: true },
   { titel: "Lunch en tussendoortjes kinderen klaarmaken", categorie: "eten", herhaling: w([1, 2, 3, 4, 5]), duurMin: 15, denkwerk: 1, standaard: true },
   { titel: "Vaatwasser in- en uitruimen", categorie: "huishouden", herhaling: d(), duurMin: 15, denkwerk: 1, standaard: true },
-  // Emotioneel werk: doorlopende verantwoordelijkheden zonder vaste momenten
-  { titel: "Merken hoe het met de kinderen gaat (school, vriendjes)", categorie: "kinderen", herhaling: dl(3), duurMin: 15, denkwerk: 2, werksoort: "emotioneel", standaard: true },
-  { titel: "Troosten en er zijn bij verdriet of boosheid", categorie: "kinderen", herhaling: dl(3), duurMin: 15, denkwerk: 2, werksoort: "emotioneel", standaard: true },
-  { titel: "Opvoedvragen aankaarten (schermtijd, eten, slapen)", categorie: "kinderen", herhaling: dl(1), duurMin: 15, denkwerk: 3, werksoort: "emotioneel", standaard: true },
-  { titel: "Contact met opa's, oma's en familie onderhouden", categorie: "sociaal", herhaling: dl(1), duurMin: 20, denkwerk: 2, werksoort: "emotioneel", standaard: true },
-  { titel: "Contact met juf, meester en opvang", categorie: "school", herhaling: dl(1), duurMin: 10, denkwerk: 2, werksoort: "emotioneel" },
   // Huishouden
   { titel: "Was draaien en ophangen", categorie: "huishouden", herhaling: w([1, 4, 6]), duurMin: 30, denkwerk: 1, standaard: true },
   { titel: "Was vouwen en opruimen", categorie: "huishouden", herhaling: w([2, 7]), duurMin: 25, denkwerk: 1, standaard: true },

@@ -51,3 +51,15 @@ export function herkenLeden(tekst: string, leden: Lid[]): { leden: string[]; tit
   }
   return { leden: leden.filter((l) => gevonden.has(l.id)).map((l) => l.id), titel };
 }
+
+/**
+ * Wat iemand invult bij "Leeftijd": meestal een leeftijd (7), soms een geboortejaar (2019).
+ * Geeft het geboortejaar terug, of undefined als het nergens op lijkt.
+ */
+export function geboortejaarUit(invoer: string | number | undefined, ditJaar: number): number | undefined {
+  const n = typeof invoer === "number" ? invoer : Number(String(invoer ?? "").trim());
+  if (!Number.isFinite(n) || String(invoer ?? "").toString().trim() === "") return undefined;
+  if (n >= 0 && n <= 40) return ditJaar - Math.round(n);
+  if (n >= 1900 && n <= ditJaar) return Math.round(n);
+  return undefined;
+}

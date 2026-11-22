@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { KLEUREN, REGIOS, type ExterneAgenda, type Lid, type Regio } from "@/lib/types";
-import { codeVan } from "@/lib/leden";
+import { codeVan, geboortejaarUit } from "@/lib/leden";
 import { post, useGezin } from "./context";
 import { Meldingen } from "./Meldingen";
 import { Blad, Bolletje, Keuzes } from "./ui";
@@ -38,13 +38,15 @@ function LidBlad({ lid, sluit }: { lid?: Lid; sluit: () => void }) {
         </div>
         {l.rol === "kind" && (
           <label className="veld">
-            <span>Geboortejaar (optioneel)</span>
+            <span>Leeftijd (optioneel)</span>
             <input
               type="number"
-              min={1990}
-              max={2100}
-              value={l.geboortejaar ?? ""}
-              onChange={(e) => zet({ ...l, geboortejaar: e.target.value ? Number(e.target.value) : undefined })}
+              inputMode="numeric"
+              min={0}
+              max={40}
+              value={l.geboortejaar ? new Date().getFullYear() - l.geboortejaar : ""}
+              onChange={(e) => zet({ ...l, geboortejaar: geboortejaarUit(e.target.value, new Date().getFullYear()) })}
+              style={{ width: 96 }}
             />
           </label>
         )}
