@@ -332,6 +332,32 @@ export function AfspraakFormulier({ afspraak, datum, sluit }: { afspraak?: Afspr
             opties={[...ouders.map((o) => ({ waarde: o.id as string | null, label: o.naam })), { waarde: null, label: "Niemand / n.v.t." }]}
           />
         </div>
+        {a.leden.some((l) => staat.leden.find((x) => x.id === l)?.rol === "kind") && !a.heleDag && (
+          <div className="twee" style={{ marginBottom: 12 }}>
+            <label className="veld" style={{ margin: 0 }}>
+              <span>Wie brengt?</span>
+              <select value={a.brengt ?? ""} onChange={(e) => wijzig({ brengt: e.target.value || null })}>
+                <option value="">Nog niemand / n.v.t.</option>
+                {ouders.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.naam}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="veld" style={{ margin: 0 }}>
+              <span>Wie haalt?</span>
+              <select value={a.haalt ?? ""} onChange={(e) => wijzig({ haalt: e.target.value || null })}>
+                <option value="">Nog niemand / n.v.t.</option>
+                {ouders.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.naam}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
         <label className="veld">
           <span>Waar</span>
           <input type="text" maxLength={200} value={a.locatie ?? ""} onChange={(e) => wijzig({ locatie: e.target.value })} />

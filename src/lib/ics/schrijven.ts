@@ -62,6 +62,13 @@ export function feedNaam(staat: Staat, lid?: string): string {
 function titel(staat: Staat, item: AgendaItem, opties: FeedOpties): string {
   const voor = item.leden.map((l) => naamVan(staat, l)).filter(Boolean);
   const basis = item.soort === "taak" ? `☐ ${item.titel}` : item.titel;
+  if (opties.lid && !item.leden.includes(opties.lid) && (item.brengt === opties.lid || item.haalt === opties.lid)) {
+    // In je eigen agenda: een rit voor de kinderen. "Naar school brengen (Stijn, Tobias)", of bij een gewone
+    // afspraak wat jouw rol is: "Judo (Stijn · jij brengt)".
+    if (item.rit) return `${basis} (${voor.join(", ")})`;
+    const rol = [item.brengt === opties.lid ? "brengen" : "", item.haalt === opties.lid ? "halen" : ""].filter(Boolean).join(" en ");
+    return `${basis} (${voor.join(", ")} · ${rol})`;
+  }
   // In de gezinsfeed zie je voor wie het is; in een persoonlijke feed is dat al duidelijk.
   return !opties.lid && voor.length && voor.length < staat.leden.length ? `${basis} (${voor.join(", ")})` : basis;
 }
@@ -70,7 +77,8 @@ function titel(staat: Staat, item: AgendaItem, opties: FeedOpties): string {
 export function schrijfFeed(staat: Staat, opties: FeedOpties): string {
   const stempel = opties.nu.toUTC().toFormat("yyyyMMdd'T'HHmmss'Z'");
   const items = appItems(staat, opties.van, opties.tot).filter(
-    (i) => !opties.lid || i.leden.includes(opties.lid) || i.regelaar === opties.lid,
+    // Een persoonlijke agenda: wat over jou gaat, wat je regelt, en de ritten waarbij jij brengt of haalt.
+    (i) => !opties.lid || i.leden.includes(opties.lid) || i.regelaar === opties.lid || i.brengt === opties.lid || i.haalt === opties.lid,
   );
   const r: string[] = [
     "BEGIN:VCALENDAR",

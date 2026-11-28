@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { eindNa } from "@/lib/agenda";
 import { kortLabel, vandaag as vandaagDatum } from "@/lib/datum";
+import { herhalingLabel } from "@/lib/herhaling";
 import { beschrijf, leesTekst, type Voorstel } from "@/lib/invoer";
 import type { Categorie } from "@/lib/types";
 import { useGezin } from "./context";
@@ -43,7 +44,7 @@ function VoorstelKaart({
   bron: "zelf" | "plakken" | "foto" | "delen";
   klaar: () => void;
 }) {
-  const { staat, ik, doe, bezig } = useGezin();
+  const { staat, ik, doe, bezig, ouders } = useGezin();
   const [v, zet] = useState(start);
   useEffect(() => zet(start), [start]);
   const wijzig = (x: Partial<Voorstel>) => zet((o) => ({ ...o, ...x }));
@@ -61,15 +62,16 @@ function VoorstelKaart({
           datum: v.datum,
           heleDag: v.heleDag || !v.begin,
           begin: v.heleDag ? undefined : v.begin,
-          eind: v.heleDag || !v.begin ? undefined : (v.eind ?? eindNa(v.begin, 60)),
+          // Een rit duurt kort; een gewone afspraak standaard een uur.
+          eind: v.heleDag || !v.begin ? undefined : (v.eind ?? eindNa(v.begin, v.rit ? 15 : 60)),
           leden: v.leden.length ? v.leden : ik ? [ik] : [],
           regelaar: null,
-          // "S&T naar school brengen": wie het invoert, brengt (of haalt).
-          brengt: v.rit && v.rit !== "halen" ? ik : null,
-          haalt: v.rit && v.rit !== "brengen" ? ik : null,
+          // "S&T naar school brengen": wie genoemd wordt of wie het invoert, brengt (of haalt).
+          brengt: v.rit && v.rit !== "halen" ? (v.door ?? ik) : null,
+          haalt: v.rit && v.rit !== "brengen" ? (v.door ?? ik) : null,
           locatie: "",
           notitie,
-          herhaling: { soort: "geen", interval: 1, dagen: [] },
+          herhaling: v.herhaling ?? { soort: "geen", interval: 1, dagen: [] },
         },
       });
     } else {
@@ -140,6 +142,22 @@ function VoorstelKaart({
               <input type="checkbox" checked={v.heleDag} onChange={(e) => wijzig({ heleDag: e.target.checked })} />
               <span>Hele dag</span>
             </label>
+          )}
+          {v.herhaling && (
+            <div className="klein" style={{ marginBottom: 8 }}>
+              🔁 {herhalingLabel(v.herhaling)}, vanaf {kortLabel(v.datum)}
+            </div>
+          )}
+          {v.rit && (
+            <div style={{ marginBottom: 10 }}>
+              <div className="veld-label">{v.rit === "halen" ? "Wie haalt?" : v.rit === "brengen" ? "Wie brengt?" : "Wie brengt en haalt?"}</div>
+              <Keuzes
+                label="Wie"
+                waarde={v.door ?? ik}
+                kies={(door) => wijzig({ door: door ?? undefined })}
+                opties={ouders.map((o) => ({ waarde: o.id as string | null, label: o.naam }))}
+              />
+            </div>
           )}
           <div className="veld-label">Voor wie</div>
           <LedenKeuze

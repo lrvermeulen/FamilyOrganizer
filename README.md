@@ -35,6 +35,8 @@ Installeren en online zetten: zie [SETUP.md](SETUP.md).
 - **Aan de slag:** bovenaan het bord de eerste stappen voor elke ouder: samen verdelen, agenda's koppelen, groep van de kinderen, meldingen, week doorlopen.
 - **Groep op school:** vul bij een kind de groep in, dan komt "groep 4" in een schoolbrief vanzelf bij het goede kind.
 
+**Vaste ritten invoeren:** plak in de inbox bijvoorbeeld "S&T naar school brengen ma do vr 8:30 Roos". Vaste dagen ("ma do vr", "elke wo", "ma t/m vr") worden een afspraak die elke week terugkomt; de genoemde ouder brengt of haalt (anders jij). Iedereen krijgt zijn eigen ritten in zijn agenda-abonnement ("Naar school brengen (Stijn, Tobias)"); school zelf hoeft er niet in.
+
 Met de **+**-knop typ je overal snel iets in, zoals "tandarts Nine do 14:00" of "melk, kaas en appels op de lijst".
 
 ## Zonder AI
