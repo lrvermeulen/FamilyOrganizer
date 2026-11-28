@@ -95,6 +95,8 @@ export interface Weekstart {
   maandag: string;
   /** Wat deze week af moet en geen routine is: losse taken, deadlines en taken die zelden terugkomen. */
   teDoen: Voorval[];
+  /** Alle afspraken van de week waarbij iemand moet brengen of halen (ook als dat al geregeld is). */
+  ritten: AgendaItem[];
   openRitten: AgendaItem[];
   botsingen: AgendaItem[];
   dagenZonderEten: string[];
@@ -128,6 +130,7 @@ export function weekstart(staat: Staat, items: AgendaItem[], maandag: string, va
     maandag,
     teDoen,
     openRitten: week.filter((i) => ritOpen(i, staat)),
+    ritten: week.filter((i) => brengHaalNodig(i, staat)),
     botsingen: week.filter((i) => bots.has(i.sleutel)),
     dagenZonderEten: dagen.filter((d) => !staat.maaltijden.some((m) => m.datum === d && m.wat)),
     takenZonderEigenaar: staat.taken.filter((t) => !t.gearchiveerd && !t.eigenaar).length,

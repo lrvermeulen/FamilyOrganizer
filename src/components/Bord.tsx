@@ -405,6 +405,49 @@ function WeekstartBlad({ sluit, naarTab }: { sluit: () => void; naarTab: (t: str
       )}
 
       <div className="kaart">
+        <h3>Brengen en halen {w.openRitten.length ? <span className="label let">{w.openRitten.length} open</span> : "✓"}</h3>
+        {w.ritten.length === 0 ? (
+          <p className="stil klein">Geen afspraken deze week waarbij iemand moet brengen of halen.</p>
+        ) : (
+          <>
+            <p className="stil klein">Tik op een regel om iets te veranderen, voor één keer of per kind.</p>
+            {Array.from({ length: 7 }, (_, n) => plusDagen(maandag, n)).map((d, n) => {
+              const regels = groepeer(w.ritten.filter((i) => i.datum === d));
+              if (!regels.length) return null;
+              return (
+                <div key={d} style={{ marginTop: 10 }}>
+                  <div className="veld-label" style={{ marginBottom: 2 }}>
+                    {WEEKDAG_LANG[n]} {dag(d).day}
+                  </div>
+                  {regels.map((g) => (
+                    <button key={g.sleutel} className="weekrit" onClick={() => zetRit(g)}>
+                      <span className="tijd">{g.begin}</span>
+                      <span className="hoofdtekst">
+                        <span className="titel">{g.titel}</span>
+                        <span className="stil klein"> · {g.leden.map((l) => lid(l)?.naam).join(", ")}</span>
+                        <span className="rollen klein">
+                          {ritRollen(g).includes("brengt") && <span className={g.brengt ? "" : "open"}>↗ {lid(g.brengt)?.naam ?? "?"}</span>}
+                          {ritRollen(g).includes("haalt") && (
+                            <span className={g.haalt ? "" : "open"}>
+                              ↙ {lid(g.haalt)?.naam ?? "?"}
+                              {g.haalVan ? ` (${g.haalVan}–${g.eind})` : g.eind ? ` (${g.eind})` : ""}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                      <span className="stil" aria-hidden>
+                        ›
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </>
+        )}
+      </div>
+
+      <div className="kaart">
         <h3>Deze week af {w.teDoen.length ? <span className="label let">{w.teDoen.length}</span> : "✓"}</h3>
         {w.teDoen.length === 0 ? (
           <p className="stil klein">Geen losse taken of deadlines deze week, behalve de vaste routine.</p>
@@ -437,22 +480,6 @@ function WeekstartBlad({ sluit, naarTab }: { sluit: () => void; naarTab: (t: str
               </li>
             ))}
           </ul>
-        )}
-      </div>
-
-      <div className="kaart">
-        <h3>Brengen en halen {w.openRitten.length ? <span className="label let">{w.openRitten.length} open</span> : "✓"}</h3>
-        {w.openRitten.length === 0 ? (
-          <p className="stil klein">Bij alles is duidelijk wie brengt en haalt.</p>
-        ) : (
-          w.openRitten.map((i) => (
-            <div key={i.sleutel}>
-              <div className="klein" style={{ marginTop: 8 }}>
-                <b>{kortLabel(i.datum)}</b> {i.begin} {i.titel} ({i.leden.map((l) => lid(l)?.naam).join(", ")})
-              </div>
-              <RitRegel item={i} open={() => zetRit(i)} />
-            </div>
-          ))
         )}
       </div>
 
