@@ -3,6 +3,7 @@ import { ritIn } from "./leden";
 import { voorvallen } from "./herhaling";
 import { voorvallenInPeriode } from "./taken";
 import type { Staat } from "./types";
+import { vakantieOp } from "./vakanties";
 
 /** Eén regel in de agenda, uit de app zelf of uit een agenda van buiten. */
 export interface AgendaItem {
@@ -30,6 +31,33 @@ export interface AgendaItem {
   regelSleutel?: string;
   /** De afspraak is zelf een rit ("S&T naar school brengen"): alleen die rol telt. */
   rit?: "brengen" | "halen" | "beide";
+  /** School of opvang: vervalt in vakanties en op studiedagen. */
+  school?: boolean;
+  /** Ophalen kan vanaf deze tijd tot het einde (BSO). */
+  haalVan?: string;
+}
+
+/** Een hele-dag-afspraak die betekent dat er geen school is. */
+const GEEN_SCHOOL_RE = /\b(studiedag|studiemiddag|margedag|vrije dag|(kinderen|leerlingen|iedereen|alle groepen|school)\s+(zijn|is)\s+vrij|vrij)\b/i;
+
+/**
+ * Is er op deze dag geen school voor deze kinderen? Bij een schoolvakantie (regio) of een studiedag
+ * (een hele-dag-afspraak met "studiedag" of "vrij", voor deze kinderen of voor niemand in het bijzonder).
+ */
+export function geenSchool(staat: Staat, datum: string, leden: string[], anderen: AgendaItem[] = []): boolean {
+  if (vakantieOp(staat.regio, datum)) return true;
+  const kandidaten: { titel: string; leden: string[]; heleDag: boolean }[] = [
+    ...staat.afspraken.filter((a) => a.heleDag && !a.school && voorvallen(a.datum, a.herhaling, datum, datum).length),
+    ...anderen.filter((i) => i.datum === datum && !i.school),
+  ];
+  const ouders = new Set(staat.leden.filter((l) => l.rol === "ouder").map((l) => l.id));
+  return kandidaten.some(
+    (k) =>
+      k.heleDag &&
+      GEEN_SCHOOL_RE.test(k.titel) &&
+      // voor deze kinderen, of algemeen (geen leden, of alleen ouders: dan staat het in een gezinsagenda)
+      (k.leden.length === 0 || k.leden.every((l) => ouders.has(l)) || k.leden.some((l) => leden.includes(l))),
+  );
 }
 
 /** Welke rollen er bij een afspraak horen: allebei, of alleen de rit waar de afspraak over gaat. */
@@ -44,6 +72,7 @@ export function appItems(staat: Staat, van: string, tot: string): AgendaItem[] {
   const uit: AgendaItem[] = [];
   for (const a of staat.afspraken) {
     for (const datum of voorvallen(a.datum, a.herhaling, van, tot)) {
+      if (a.school && geenSchool(staat, datum, a.leden)) continue;
       uit.push({
         sleutel: `a-${a.id}-${datum}`,
         soort: "afspraak",
@@ -56,7 +85,9 @@ export function appItems(staat: Staat, van: string, tot: string): AgendaItem[] {
         regelaar: a.regelaar,
         brengt: a.brengt,
         haalt: a.haalt,
-        rit: a.leden.some((l) => staat.leden.find((x) => x.id === l)?.rol === "kind") ? (ritIn(a.titel) ?? undefined) : undefined,
+        rit: !a.school && a.leden.some((l) => staat.leden.find((x) => x.id === l)?.rol === "kind") ? (ritIn(a.titel) ?? undefined) : undefined,
+        school: a.school || undefined,
+        haalVan: a.haalVan,
         locatie: a.locatie || undefined,
         notitie: a.notitie || undefined,
         refId: a.id,

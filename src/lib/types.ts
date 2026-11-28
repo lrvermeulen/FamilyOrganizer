@@ -134,6 +134,10 @@ export const AfspraakSchema = z.object({
   /** Wie brengt en wie haalt (een ouder, of bijvoorbeeld opa of oma buiten de app: null). */
   brengt: Id.nullable().default(null),
   haalt: Id.nullable().default(null),
+  /** Ophalen kan vanaf deze tijd tot het einde (bijvoorbeeld BSO: tussen 15:00 en 17:30). */
+  haalVan: Klok.optional(),
+  /** School (of opvang): vervalt in schoolvakanties en op studiedagen. */
+  school: z.boolean().default(false),
   locatie: z.string().max(200).default(""),
   notitie: z.string().max(2000).default(""),
   herhaling: HerhalingSchema,

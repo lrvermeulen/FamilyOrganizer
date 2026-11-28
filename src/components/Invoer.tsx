@@ -66,9 +66,11 @@ function VoorstelKaart({
           eind: v.heleDag || !v.begin ? undefined : (v.eind ?? eindNa(v.begin, v.rit ? 15 : 60)),
           leden: v.leden.length ? v.leden : ik ? [ik] : [],
           regelaar: null,
-          // "S&T naar school brengen": wie genoemd wordt of wie het invoert, brengt (of haalt).
-          brengt: v.rit && v.rit !== "halen" ? (v.door ?? ik) : null,
-          haalt: v.rit && v.rit !== "brengen" ? (v.door ?? ik) : null,
+          // Uitdrukkelijk genoemd ("brengt Roos haalt Lau"), of bij een rit: wie genoemd wordt of wie het invoert.
+          brengt: v.brengt ?? (v.rit && v.rit !== "halen" ? (v.door ?? ik) : null),
+          haalt: v.haalt ?? (v.rit && v.rit !== "brengen" ? (v.door ?? ik) : null),
+          haalVan: v.haalVan,
+          school: !!v.school,
           locatie: "",
           notitie,
           herhaling: v.herhaling ?? { soort: "geen", interval: 1, dagen: [] },
@@ -146,6 +148,32 @@ function VoorstelKaart({
           {v.herhaling && (
             <div className="klein" style={{ marginBottom: 8 }}>
               🔁 {herhalingLabel(v.herhaling)}, vanaf {kortLabel(v.datum)}
+            </div>
+          )}
+          {(v.school || v.brengt || v.haalt) && (
+            <div style={{ marginBottom: 10 }}>
+              {v.school && <div className="klein" style={{ marginBottom: 6 }}>🏫 School: vervalt in vakanties en op studiedagen</div>}
+              {v.haalVan && (
+                <div className="klein" style={{ marginBottom: 6 }}>
+                  Ophalen tussen {v.haalVan} en {v.eind}
+                </div>
+              )}
+              <div className="veld-label">Wie brengt?</div>
+              <Keuzes
+                label="Brengt"
+                waarde={v.brengt ?? null}
+                kies={(x) => wijzig({ brengt: x ?? undefined })}
+                opties={[...ouders.map((o) => ({ waarde: o.id as string | null, label: o.naam })), { waarde: null, label: "Niemand" }]}
+              />
+              <div className="veld-label" style={{ marginTop: 8 }}>
+                Wie haalt?
+              </div>
+              <Keuzes
+                label="Haalt"
+                waarde={v.haalt ?? null}
+                kies={(x) => wijzig({ haalt: x ?? undefined })}
+                opties={[...ouders.map((o) => ({ waarde: o.id as string | null, label: o.naam })), { waarde: null, label: "Niemand" }]}
+              />
             </div>
           )}
           {v.rit && (

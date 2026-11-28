@@ -358,6 +358,25 @@ export function AfspraakFormulier({ afspraak, datum, sluit }: { afspraak?: Afspr
             </label>
           </div>
         )}
+        {a.leden.some((l) => staat.leden.find((x) => x.id === l)?.rol === "kind") && !a.heleDag && (
+          <>
+            <label className="vink">
+              <input type="checkbox" checked={!!a.school} onChange={(e) => wijzig({ school: e.target.checked })} />
+              <span>
+                School of opvang
+                <span className="stil klein" style={{ display: "block" }}>
+                  Vervalt in schoolvakanties en op studiedagen, met de ritten erbij.
+                </span>
+              </span>
+            </label>
+            {a.haalt && (
+              <label className="veld">
+                <span>Ophalen vanaf (optioneel, bijvoorbeeld bij BSO)</span>
+                <input type="time" value={a.haalVan ?? ""} onChange={(e) => wijzig({ haalVan: e.target.value || undefined })} />
+              </label>
+            )}
+          </>
+        )}
         <label className="veld">
           <span>Waar</span>
           <input type="text" maxLength={200} value={a.locatie ?? ""} onChange={(e) => wijzig({ locatie: e.target.value })} />

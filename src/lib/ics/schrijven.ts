@@ -1,5 +1,5 @@
 import { DateTime } from "luxon";
-import { appItems, type AgendaItem } from "../agenda";
+import { appItems, eindNa, type AgendaItem } from "../agenda";
 import { dag, plusDagen, TIJDZONE } from "../datum";
 import type { Staat } from "../types";
 import { vakantiesIn } from "../vakanties";
@@ -53,6 +53,33 @@ function naamVan(staat: Staat, id: string | null | undefined): string | undefine
   return staat.leden.find((l) => l.id === id)?.naam;
 }
 
+type Moment = AgendaItem & { vasteTitel?: string };
+
+/**
+ * Wat er van een afspraak in een agenda komt. In de agenda van iemand die alleen brengt of haalt
+ * (bijvoorbeeld bij school): niet het hele blok, maar alleen de korte ritmomenten.
+ * "Stijn en Tobias brengen (School)" om 8:30, en "Stijn en Tobias halen (School en BSO, tussen 15:00 en 17:30)".
+ */
+function momenten(staat: Staat, item: AgendaItem, opties: FeedOpties): Moment[] {
+  const lid = opties.lid;
+  if (!lid || item.soort !== "afspraak" || item.rit || item.heleDag || !item.begin || item.leden.includes(lid)) return [item];
+  if (item.brengt !== lid && item.haalt !== lid) return [item];
+  const namen = item.leden.map((l) => naamVan(staat, l)).filter(Boolean).join(" en ");
+  const uit: Moment[] = [];
+  if (item.brengt === lid) {
+    uit.push({ ...item, sleutel: `${item.sleutel}-brengen`, eind: eindNa(item.begin, 15), vasteTitel: `${namen} brengen (${item.titel})` });
+  }
+  if (item.haalt === lid) {
+    const eind = item.eind ?? eindNa(item.begin, 60);
+    uit.push(
+      item.haalVan
+        ? { ...item, sleutel: `${item.sleutel}-halen`, begin: item.haalVan, eind, vasteTitel: `${namen} halen (${item.titel}, tussen ${item.haalVan} en ${eind})` }
+        : { ...item, sleutel: `${item.sleutel}-halen`, begin: eind, eind: eindNa(eind, 15), vasteTitel: `${namen} halen (${item.titel})` },
+    );
+  }
+  return uit;
+}
+
 export function feedNaam(staat: Staat, lid?: string): string {
   const gezin = staat.gezinsnaam || "Gezin";
   const n = lid ? naamVan(staat, lid) : undefined;
@@ -62,12 +89,9 @@ export function feedNaam(staat: Staat, lid?: string): string {
 function titel(staat: Staat, item: AgendaItem, opties: FeedOpties): string {
   const voor = item.leden.map((l) => naamVan(staat, l)).filter(Boolean);
   const basis = item.soort === "taak" ? `☐ ${item.titel}` : item.titel;
-  if (opties.lid && !item.leden.includes(opties.lid) && (item.brengt === opties.lid || item.haalt === opties.lid)) {
-    // In je eigen agenda: een rit voor de kinderen. "Naar school brengen (Stijn, Tobias)", of bij een gewone
-    // afspraak wat jouw rol is: "Judo (Stijn · jij brengt)".
-    if (item.rit) return `${basis} (${voor.join(", ")})`;
-    const rol = [item.brengt === opties.lid ? "brengen" : "", item.haalt === opties.lid ? "halen" : ""].filter(Boolean).join(" en ");
-    return `${basis} (${voor.join(", ")} · ${rol})`;
+  if (opties.lid && item.rit && !item.leden.includes(opties.lid)) {
+    // In je eigen agenda: een rit voor de kinderen. "Naar school brengen (Stijn, Tobias)".
+    return `${basis} (${voor.join(", ")})`;
   }
   // In de gezinsfeed zie je voor wie het is; in een persoonlijke feed is dat al duidelijk.
   return !opties.lid && voor.length && voor.length < staat.leden.length ? `${basis} (${voor.join(", ")})` : basis;
@@ -91,7 +115,7 @@ export function schrijfFeed(staat: Staat, opties: FeedOpties): string {
     "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
     "X-PUBLISHED-TTL:PT1H",
   ];
-  for (const item of items) {
+  for (const item of items.flatMap((i) => momenten(staat, i, opties))) {
     const omschrijving: string[] = [];
     const regelaar = naamVan(staat, item.regelaar);
     if (regelaar) omschrijving.push(item.soort === "taak" ? `Wie: ${regelaar}` : `Regelt: ${regelaar}`);
@@ -102,7 +126,7 @@ export function schrijfFeed(staat: Staat, opties: FeedOpties): string {
     } else {
       r.push(`DTSTART:${utc(item.datum, item.begin)}`, `DTEND:${utc(item.datum, item.eind ?? item.begin)}`);
     }
-    r.push(`SUMMARY:${ontsnap(titel(staat, item, opties))}`);
+    r.push(`SUMMARY:${ontsnap(item.vasteTitel ?? titel(staat, item, opties))}`);
     if (item.locatie) r.push(`LOCATION:${ontsnap(item.locatie)}`);
     if (omschrijving.length) r.push(`DESCRIPTION:${ontsnap(omschrijving.join("\n"))}`);
     if (item.soort === "taak") r.push("TRANSP:TRANSPARENT");

@@ -1,4 +1,4 @@
-import { appItems, betreft, metRegelingen, overlapt, ritRollen, sorteer, type AgendaItem } from "./agenda";
+import { appItems, betreft, geenSchool, metRegelingen, overlapt, ritRollen, sorteer, type AgendaItem } from "./agenda";
 import { maandagVan, plusDagen } from "./datum";
 import { openVoorvallen, uitvoerderVanKeer, type Voorval } from "./taken";
 import type { Maaltijd, Staat } from "./types";
@@ -6,7 +6,10 @@ import { vakantieOp, type Vakantie } from "./vakanties";
 
 /** Alles voor [van, tot] bij elkaar: afspraken uit de app, gekoppelde agenda's en ingeplande taken. */
 export function alleItems(staat: Staat, extern: AgendaItem[], van: string, tot: string): AgendaItem[] {
-  return sorteer([...appItems(staat, van, tot), ...metRegelingen(extern, staat)].filter((i) => i.datum >= van && i.datum <= tot));
+  const ext = metRegelingen(extern, staat);
+  // Studiedagen uit gekoppelde agenda's (bijvoorbeeld Social Schools) laten school ook vervallen.
+  const app = appItems(staat, van, tot).filter((i) => !i.school || !geenSchool(staat, i.datum, i.leden, ext));
+  return sorteer([...app, ...ext].filter((i) => i.datum >= van && i.datum <= tot));
 }
 
 /** Staat er bij een afspraak nog een rol open (brengen of halen) die ertoe doet? */
