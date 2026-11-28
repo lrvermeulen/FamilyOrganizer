@@ -153,7 +153,16 @@ function RitBlad({ item, sluit }: { item: AgendaItem; sluit: () => void }) {
           <div className="veld-label" style={{ marginTop: 10 }}>
             Wie brengt?
           </div>
-          <Keuzes label="Brengt" waarde={brengt} kies={zetBrengt} opties={opties} />
+          <Keuzes
+            label="Brengt"
+            waarde={brengt}
+            kies={(nieuw) => {
+              // Wie brengt, haalt ook (als halen bij deze afspraak hoort), tenzij er al iemand anders haalt.
+              if (ritRollen(item).includes("haalt") && (!haalt || haalt === brengt)) zetHaalt(nieuw);
+              zetBrengt(nieuw);
+            }}
+            opties={opties}
+          />
         </>
       )}
       {ritRollen(item).includes("haalt") && (
