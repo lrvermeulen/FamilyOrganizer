@@ -35,6 +35,8 @@ Installeren en online zetten: zie [SETUP.md](SETUP.md).
 - **Aan de slag:** bovenaan het bord de eerste stappen voor elke ouder: samen verdelen, agenda's koppelen, groep van de kinderen, meldingen, week doorlopen.
 - **Groep op school:** vul bij een kind de groep in, dan komt "groep 4" in een schoolbrief vanzelf bij het goede kind.
 
+**Terugkerende afspraken:** bij bewerken, verwijderen en brengen/halen kies je "alleen deze keer", "deze en volgende" of "hele reeks". Een vraag aan de ander ("kun jij dinsdag halen?") geldt alleen voor die keer. Afspraken die voor meerdere kinderen helemaal gelijk zijn (tijden, brenger, haler), staan als één regel op het bord. Wil je voor één kind iets anders (Tobias brengt Roos, Stijn blijft bij Lau), kies dan in het venster "Voor wie": de afspraak splitst zich vanzelf, voor de keren die je kiest.
+
 **School vastleggen:** plak in de inbox bijvoorbeeld "S&T school ma vr 8:30-15:00 brengt Roos haalt Roos" of "S&T school elke do 8:30-15:00 BSO tot 17:30 brengt Roos haalt Lau". Dat wordt één afspraak per dag bij de kinderen, met een brenger en een haler. School vervalt vanzelf in schoolvakanties en op studiedagen (uit de app of uit Social Schools), met de ritten erbij. In de agenda van wie brengt of haalt komen alleen de korte ritmomenten ("Stijn en Tobias brengen (School)" om 8:30, "Stijn en Tobias halen (School en BSO, tussen 15:00 en 17:30)"), niet het hele schoolblok. Vaste dagen: "ma vr", "elke wo", "ma t/m vr".
 
 Met de **+**-knop typ je overal snel iets in, zoals "tandarts Nine do 14:00" of "melk, kaas en appels op de lijst".
@@ -94,6 +96,7 @@ Lokaal met wachtwoord: `GEZIN_WACHTWOORD=test npm run dev`. Gegevens staan dan i
 | `src/lib/types.ts` | Het datamodel (zod-schema's) |
 | `src/lib/acties.ts` | Alle wijzigingen als één pure functie `pasToe(staat, actie)` |
 | `src/lib/herhaling.ts`, `taken.ts` | Herhalingen uitschrijven, welke taken openstaan |
+| `src/lib/afspraken.ts` | Keren van een reeks, afwijkingen per keer, wijzigen per bereik en per kind splitsen |
 | `src/lib/bord.ts` | Het weekbord: per dag en per gezinslid, brengen en halen, botsingen, week doorlopen |
 | `src/lib/invoer.ts` | De invoerregel: Nederlandse tekst naar voorstellen, zonder AI |
 | `src/lib/leden.ts` | Gezinsleden herkennen in een titel: namen en letters ("S judo") |

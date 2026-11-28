@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import type { AfspraakInvoer, TaakInvoer } from "@/lib/acties";
-import { vandaag as vandaagDatum, WEEKDAG_KORT } from "@/lib/datum";
+import { keerOp, type Bereik } from "@/lib/afspraken";
+import { kortLabel, vandaag as vandaagDatum, WEEKDAG_KORT } from "@/lib/datum";
 import { herhalingLabel } from "@/lib/herhaling";
 import { CATEGORIEEN, DENKWERK, type Afspraak, type Categorie, type Denkwerk, type Herhaling, type Taak, type Werksoort } from "@/lib/types";
 import { useGezin } from "./context";
@@ -261,11 +262,26 @@ export function TaakFormulier({
   );
 }
 
-export function AfspraakFormulier({ afspraak, datum, sluit }: { afspraak?: Afspraak; datum?: string; sluit: () => void }) {
+export function AfspraakFormulier({
+  afspraak,
+  datum,
+  origineel,
+  sluit,
+}: {
+  afspraak?: Afspraak;
+  datum?: string;
+  /** Bij een reeks: de keer die je hebt aangetikt (oorspronkelijke dag). */
+  origineel?: string;
+  sluit: () => void;
+}) {
   const { staat, ouders, doe, bezig } = useGezin();
+  const reeks = !!afspraak && afspraak.herhaling.soort !== "geen";
+  const keer = afspraak && reeks && origineel ? keerOp(afspraak, origineel) : null;
+  const [bereik, zetBereik] = useState<Bereik>(keer ? "deze" : "reeks");
   const [a, zet] = useState<AfspraakInvoer>(() =>
     afspraak
-      ? { ...afspraak }
+      ? // Bij een reeks: deze keer zoals hij nu is (met eventuele afwijkingen), op zijn huidige dag.
+        { ...afspraak, ...(keer ? { ...keer.velden, datum: keer.datum } : {}) }
       : {
           titel: "",
           datum: datum ?? vandaagDatum(),
@@ -284,12 +300,33 @@ export function AfspraakFormulier({ afspraak, datum, sluit }: { afspraak?: Afspr
   const opslaan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!a.leden.length) return alert("Kies voor wie de afspraak is");
-    if (await doe({ type: "afspraak.opslaan", afspraak: { ...a, begin: a.heleDag ? undefined : a.begin, eind: a.heleDag ? undefined : a.eind } })) sluit();
+    const schoon = { ...a, begin: a.heleDag ? undefined : a.begin, eind: a.heleDag ? undefined : a.eind };
+    if (await doe({ type: "afspraak.opslaan", afspraak: schoon, origineel: keer?.origineel, bereik: keer ? bereik : "reeks" })) sluit();
   };
 
   return (
     <Blad titel={afspraak ? "Afspraak bewerken" : "Nieuwe afspraak"} sluit={sluit}>
       <form onSubmit={opslaan}>
+        {keer && (
+          <div className="kaart" style={{ marginBottom: 12 }}>
+            <div className="veld-label">Dit is een terugkerende afspraak. Wat wil je aanpassen?</div>
+            <Keuzes
+              label="Wat aanpassen"
+              waarde={bereik}
+              kies={zetBereik}
+              opties={[
+                { waarde: "deze", label: `Alleen ${kortLabel(keer.datum)}` },
+                { waarde: "volgende", label: "Deze en volgende" },
+                { waarde: "reeks", label: "Hele reeks" },
+              ]}
+            />
+            {keer.afwijkend && bereik === "reeks" && (
+              <p className="stil klein" style={{ marginTop: 6 }}>
+                Keren die je eerder los hebt aangepast, blijven zoals ze zijn.
+              </p>
+            )}
+          </div>
+        )}
         <label className="veld">
           <span>Wat</span>
           <input type="text" required maxLength={120} value={a.titel} onChange={(e) => wijzig({ titel: e.target.value })} autoFocus={!afspraak} />
@@ -322,7 +359,7 @@ export function AfspraakFormulier({ afspraak, datum, sluit }: { afspraak?: Afspr
             </label>
           </div>
         )}
-        <HerhalingVeld waarde={a.herhaling as Herhaling} zet={(herhaling) => wijzig({ herhaling })} />
+        {!(keer && bereik === "deze") && <HerhalingVeld waarde={a.herhaling as Herhaling} zet={(herhaling) => wijzig({ herhaling })} />}
         <div className="veld" style={{ marginBottom: 12 }}>
           <span className="veld-label">Wie regelt het? (brengen, halen, erbij zijn)</span>
           <Keuzes
@@ -400,7 +437,18 @@ export function AfspraakFormulier({ afspraak, datum, sluit }: { afspraak?: Afspr
               disabled={bezig}
               onClick={async () => {
                 const extra = afspraak.herhaling.soort !== "geen" ? " Dit verwijdert alle keren." : "";
-                if (confirm(`"${afspraak.titel}" verwijderen?${extra}`) && (await doe({ type: "afspraak.verwijderen", id: afspraak.id }))) sluit();
+                const wat = keer
+                  ? bereik === "deze"
+                    ? ` Alleen ${kortLabel(keer.datum)}.`
+                    : bereik === "volgende"
+                      ? ` Vanaf ${kortLabel(keer.datum)}.`
+                      : extra
+                  : extra;
+                if (
+                  confirm(`"${a.titel}" verwijderen?${wat}`) &&
+                  (await doe({ type: "afspraak.verwijderen", id: afspraak.id, origineel: keer?.origineel, bereik: keer ? bereik : "reeks" }))
+                )
+                  sluit();
               }}
             >
               Verwijderen

@@ -122,6 +122,7 @@ export function demoStaat(nu: DateTime): Staat {
     brengt: null,
     haalt: null,
     school: false,
+    afwijkingen: [],
     locatie: "",
     notitie: "",
     herhaling: { soort: "geen", interval: 1, dagen: [] },
