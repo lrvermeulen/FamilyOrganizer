@@ -336,7 +336,14 @@ export function AfspraakFormulier({ afspraak, datum, sluit }: { afspraak?: Afspr
           <div className="twee" style={{ marginBottom: 12 }}>
             <label className="veld" style={{ margin: 0 }}>
               <span>Wie brengt?</span>
-              <select value={a.brengt ?? ""} onChange={(e) => wijzig({ brengt: e.target.value || null })}>
+              <select
+                value={a.brengt ?? ""}
+                onChange={(e) => {
+                  const nieuw = e.target.value || null;
+                  // Wie brengt, haalt ook, tenzij er al iemand anders als haler gekozen is.
+                  wijzig({ brengt: nieuw, haalt: !a.haalt || a.haalt === a.brengt ? nieuw : a.haalt });
+                }}
+              >
                 <option value="">Nog niemand / n.v.t.</option>
                 {ouders.map((o) => (
                   <option key={o.id} value={o.id}>

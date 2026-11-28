@@ -162,7 +162,8 @@ function VoorstelKaart({
               <Keuzes
                 label="Brengt"
                 waarde={v.brengt ?? null}
-                kies={(x) => wijzig({ brengt: x ?? undefined })}
+                // De haler gaat mee met de brenger, tenzij er al iemand anders als haler gekozen is.
+                kies={(x) => wijzig({ brengt: x ?? undefined, haalt: !v.haalt || v.haalt === v.brengt ? (x ?? undefined) : v.haalt })}
                 opties={[...ouders.map((o) => ({ waarde: o.id as string | null, label: o.naam })), { waarde: null, label: "Niemand" }]}
               />
               <div className="veld-label" style={{ marginTop: 8 }}>

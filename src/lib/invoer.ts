@@ -285,6 +285,8 @@ export function leesRegel(regel: string, opties: { vandaag: string; leden: Lid[]
   if (bso) titelTekst = titelTekst.replace(bso[0], " ");
   const rol = (id: string) => opties.leden.find((l) => l.id === id)?.rol;
   const kinderen = leden.filter((l) => rol(l) === "kind");
+  // Wie brengt, haalt ook, tenzij er uitdrukkelijk iemand anders haalt.
+  if (rollen.brengt && !rollen.haalt) rollen.haalt = rollen.brengt;
   const uitdrukkelijk = !!(rollen.brengt || rollen.haalt);
   const rit = kinderen.length && soort === "afspraak" && !uitdrukkelijk ? (ritIn(bron) ?? undefined) : undefined;
   if (uitdrukkelijk) leden = kinderen.length ? kinderen : leden;

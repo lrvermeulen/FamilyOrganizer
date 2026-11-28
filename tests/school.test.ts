@@ -138,3 +138,11 @@ describe("herinneringen", () => {
     expect(om("14:40")).toEqual(["l: Over 20 min: Stijn en Tobias halen (School en BSO) | Jij haalt, tussen 15:00 en 17:30."]);
   });
 });
+
+describe("wie brengt, haalt ook", () => {
+  it("tenzij er uitdrukkelijk iemand anders haalt", () => {
+    const [a, b] = leesTekst("S&T judo elke di 16:45-17:45 brengt Roos\nS&T judo elke do 16:45-17:45 brengt Roos haalt Lau", { vandaag: "2026-11-28", leden });
+    expect([a.brengt, a.haalt]).toEqual(["r", "r"]);
+    expect([b.brengt, b.haalt]).toEqual(["r", "l"]);
+  });
+});
