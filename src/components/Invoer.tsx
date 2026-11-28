@@ -64,6 +64,9 @@ function VoorstelKaart({
           eind: v.heleDag || !v.begin ? undefined : (v.eind ?? eindNa(v.begin, 60)),
           leden: v.leden.length ? v.leden : ik ? [ik] : [],
           regelaar: null,
+          // "S&T naar school brengen": wie het invoert, brengt (of haalt).
+          brengt: v.rit && v.rit !== "halen" ? ik : null,
+          haalt: v.rit && v.rit !== "brengen" ? ik : null,
           locatie: "",
           notitie,
           herhaling: { soort: "geen", interval: 1, dagen: [] },

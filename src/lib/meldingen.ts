@@ -1,4 +1,4 @@
-import type { AgendaItem } from "./agenda";
+import { ritRollen, type AgendaItem } from "./agenda";
 import { bordTaken } from "./bord";
 import { minutenTussen } from "./datum";
 import { openVoorvallen, uitvoerderVanKeer } from "./taken";
@@ -35,7 +35,9 @@ function ritTekst(staat: Staat, item: AgendaItem, lid: string): string {
   const kind = item.leden.some((l) => staat.leden.find((x) => x.id === l)?.rol === "kind");
   if (!kind || item.heleDag || !item.begin) return "";
   const wie = (x: string | null | undefined) => (x === lid ? "jij" : (naam(staat, x) ?? "nog niemand"));
-  return ` (brengt: ${wie(item.brengt)}, haalt: ${wie(item.haalt)})`;
+  return ` (${ritRollen(item)
+    .map((r) => `${r === "brengt" ? "brengt" : "haalt"}: ${wie(item[r])}`)
+    .join(", ")})`;
 }
 
 /** De ochtendbriefing voor één ouder: de dag van het hele gezin, plus eten en wat jij niet moet vergeten. */

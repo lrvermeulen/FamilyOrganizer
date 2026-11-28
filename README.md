@@ -60,6 +60,7 @@ De app gebruikt iCal, de standaard die Google Agenda en Apple Agenda allebei beg
 - **Naar jullie eigen agenda:** abonnementen voor het hele gezin of per persoon (bij Gezin). Met afspraken, ingeplande taken en schoolvakanties. Apple ververst zo vaak als je instelt; Google zelf, meestal een paar keer per dag.
 - **Naar de app:** koppel agenda's via hun iCal-adres: Google, iCloud, **Social Schools** (Agenda → Abonneren) of de sportclub. Brengen en halen leg je vast in de app, ook bij afspraken uit deze agenda's.
 - **Gezamenlijke agenda:** koppel hem als "Het hele gezin". Afspraken komen dan bij wie in de titel staat: een naam ("Zwemles Stijn") of letters vooraan ("S judo", "S+T zwemmen", "L&R etentje"). Zonder naam of letter komen ze bij de ouders. De letter is standaard de eerste letter van de naam, en per gezinslid aan te passen. De invoerregel begrijpt dezelfde letters.
+- **Ritten in je eigen agenda:** "S&T naar school brengen" in de agenda van Lau betekent: Lau brengt Stijn en Tobias. De app zet het bij de kinderen, met Lau als brenger, en vraagt niet ook nog wie haalt. In een gezinsagenda werkt "R brengt S naar zwemles" ook. Neemt de ander het in de app over, dan gaat dat voor.
 - **Schoolvakanties:** per regio, uit de open data van de Rijksoverheid.
 
 ## Meldingen

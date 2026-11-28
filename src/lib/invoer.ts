@@ -1,7 +1,7 @@
 import { DateTime } from "luxon";
 import { splitsBoodschappen } from "./boodschappen";
 import { alsDatum, dag } from "./datum";
-import { herkenLeden } from "./leden";
+import { herkenLeden, ritIn, type Rit } from "./leden";
 import type { Lid } from "./types";
 
 /**
@@ -25,6 +25,8 @@ export interface Voorstel {
   datumGevonden: boolean;
   /** Het stuk tekst waar dit voorstel uit komt. */
   bron: string;
+  /** De afspraak is zelf een rit ("S&T naar school brengen"): wie het invoert, brengt of haalt. */
+  rit?: Rit;
 }
 
 const MAANDEN: Record<string, number> = {
@@ -229,6 +231,7 @@ export function leesRegel(regel: string, opties: { vandaag: string; leden: Lid[]
     boodschappen: [],
     datumGevonden: !!d.datum,
     bron,
+    rit: leden.length && soort === "afspraak" ? (ritIn(bron) ?? undefined) : undefined,
   };
 }
 

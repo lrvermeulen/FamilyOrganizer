@@ -24,9 +24,39 @@ export function codeVan(lid: Lid, leden: Lid[]): string | undefined {
  * - namen ergens in de tekst: "Zwemles Stijn", "verjaardag van Roos".
  * Geeft de gevonden leden terug en de titel zonder de letters vooraan.
  */
+/**
+ * Titels uit agenda's bevatten soms onzichtbare tekens of tekens uit een andere tekenset
+ * (een "&" als "&amp;" of als breed teken). Maak ze gewoon, zodat letters als "S&T" herkend worden.
+ */
+export function normaliseer(tekst: string): string {
+  return tekst
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/[\uFF01-\uFF5E]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+    .replace(/[\u00A0\u202F\u2007]/g, " ")
+    .trim();
+}
+
+export type Rit = "brengen" | "halen" | "beide";
+
+/** Gaat de afspraak zelf over brengen of halen? ("S&T naar school brengen", "T ophalen bij de BSO") */
+export function ritIn(tekst: string): Rit | null {
+  const t = tekst.toLowerCase();
+  const brengen = /\b(weg)?breng(en|t)?\b/.test(t);
+  const halen = /\b(op)?ha(len|alt|al)\b/.test(t);
+  if (brengen && halen) return "beide";
+  return brengen ? "brengen" : halen ? "halen" : null;
+}
+
 export function herkenLeden(tekst: string, leden: Lid[]): { leden: string[]; titel: string } {
   const gevonden = new Set<string>();
-  let titel = tekst.trim();
+  // Emoji of tekens vooraan ("🚗 S&T judo") niet laten meetellen bij de letters.
+  let titel = normaliseer(tekst).replace(/^[^\p{L}\p{N}]+/u, "");
+  tekst = normaliseer(tekst);
 
   const codes = leden
     .map((l) => ({ id: l.id, code: codeVan(l, leden) }))
@@ -42,6 +72,15 @@ export function herkenLeden(tekst: string, leden: Lid[]): { leden: string[]; tit
         if (c) gevonden.add(c.id);
       }
       titel = titel.slice(m[0].length);
+      // "R brengt S naar zwemles": ook de letters direct na brengt/haalt.
+      const na = new RegExp(`^((?:breng|haal)t?|brengen|halen|ophalen)\\s+(${code}(?:${scheiding}${code})*)(?=\\s|$)`, "i").exec(titel);
+      if (na) {
+        for (const deel of na[2].split(new RegExp(scheiding))) {
+          const c = codes.find((x) => x.code === deel.trim());
+          if (c) gevonden.add(c.id);
+        }
+        titel = (na[1] + titel.slice(na[0].length)).trim();
+      }
       titel = titel.charAt(0).toUpperCase() + titel.slice(1);
     }
   }
