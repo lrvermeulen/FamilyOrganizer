@@ -1,3 +1,4 @@
+import { keren } from "./afspraken";
 import { minutenTussen } from "./datum";
 import { ritIn } from "./leden";
 import { voorvallen } from "./herhaling";
@@ -35,6 +36,9 @@ export interface AgendaItem {
   school?: boolean;
   /** Ophalen kan vanaf deze tijd tot het einde (BSO). */
   haalVan?: string;
+  /** Bij een afspraak in de app: de oorspronkelijke dag van deze keer, en of hij bij een reeks hoort. */
+  origineel?: string;
+  reeks?: boolean;
 }
 
 /** Een hele-dag-afspraak die betekent dat er geen school is. */
@@ -47,7 +51,7 @@ const GEEN_SCHOOL_RE = /\b(studiedag|studiemiddag|margedag|vrije dag|(kinderen|l
 export function geenSchool(staat: Staat, datum: string, leden: string[], anderen: AgendaItem[] = []): boolean {
   if (vakantieOp(staat.regio, datum)) return true;
   const kandidaten: { titel: string; leden: string[]; heleDag: boolean }[] = [
-    ...staat.afspraken.filter((a) => a.heleDag && !a.school && voorvallen(a.datum, a.herhaling, datum, datum).length),
+    ...staat.afspraken.filter((a) => !a.school).flatMap((a) => keren(a, datum, datum).map((k) => k.velden)),
     ...anderen.filter((i) => i.datum === datum && !i.school),
   ];
   const ouders = new Set(staat.leden.filter((l) => l.rol === "ouder").map((l) => l.id));
@@ -71,26 +75,29 @@ export function ritRollen(item: AgendaItem): ("brengt" | "haalt")[] {
 export function appItems(staat: Staat, van: string, tot: string): AgendaItem[] {
   const uit: AgendaItem[] = [];
   for (const a of staat.afspraken) {
-    for (const datum of voorvallen(a.datum, a.herhaling, van, tot)) {
-      if (a.school && geenSchool(staat, datum, a.leden)) continue;
+    for (const k of keren(a, van, tot)) {
+      const v = k.velden;
+      if (a.school && geenSchool(staat, k.datum, v.leden)) continue;
       uit.push({
-        sleutel: `a-${a.id}-${datum}`,
+        sleutel: `a-${a.id}-${k.origineel}`,
         soort: "afspraak",
-        titel: a.titel,
-        datum,
-        heleDag: a.heleDag,
-        begin: a.heleDag ? undefined : a.begin,
-        eind: a.heleDag ? undefined : a.eind,
-        leden: a.leden,
-        regelaar: a.regelaar,
-        brengt: a.brengt,
-        haalt: a.haalt,
-        rit: !a.school && a.leden.some((l) => staat.leden.find((x) => x.id === l)?.rol === "kind") ? (ritIn(a.titel) ?? undefined) : undefined,
+        titel: v.titel,
+        datum: k.datum,
+        origineel: k.origineel,
+        heleDag: v.heleDag,
+        begin: v.heleDag ? undefined : v.begin,
+        eind: v.heleDag ? undefined : v.eind,
+        leden: v.leden,
+        regelaar: v.regelaar,
+        brengt: v.brengt,
+        haalt: v.haalt,
+        rit: !a.school && v.leden.some((l) => staat.leden.find((x) => x.id === l)?.rol === "kind") ? (ritIn(v.titel) ?? undefined) : undefined,
         school: a.school || undefined,
-        haalVan: a.haalVan,
-        locatie: a.locatie || undefined,
-        notitie: a.notitie || undefined,
+        haalVan: v.haalVan,
+        locatie: v.locatie || undefined,
+        notitie: v.notitie || undefined,
         refId: a.id,
+        reeks: a.herhaling.soort !== "geen" || undefined,
       });
     }
   }

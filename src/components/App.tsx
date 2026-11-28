@@ -82,7 +82,7 @@ function Schil() {
     const h = location.hash.slice(1);
     return TABS.some((t) => t.id === h) ? h : (OUD[h] ?? "bord");
   });
-  const [blad, zetBlad] = useState<null | { soort: "snel" } | { soort: "taak" } | { soort: "afspraak"; id?: string; datum?: string }>(null);
+  const [blad, zetBlad] = useState<null | { soort: "snel" } | { soort: "taak" } | { soort: "afspraak"; id?: string; datum?: string; origineel?: string }>(null);
   const { ik } = useGezin();
   const inbox =
     staat.opgemerkt.filter((o) => !o.afgehandeld).length + staat.verzoeken.filter((v) => v.aan === ik && v.status === "open").length;
@@ -108,7 +108,7 @@ function Schil() {
           <Bord
             naarTab={naarTab}
             nieuweAfspraak={(datum) => zetBlad({ soort: "afspraak", datum })}
-            bewerkAfspraak={(id) => zetBlad({ soort: "afspraak", id })}
+            bewerkAfspraak={(id, origineel) => zetBlad({ soort: "afspraak", id, origineel })}
           />
         )}
         {tab === "inbox" && <Inbox />}
@@ -159,7 +159,7 @@ function Schil() {
         </Blad>
       )}
       {blad?.soort === "taak" && <TaakFormulier sluit={() => zetBlad(null)} />}
-      {blad?.soort === "afspraak" && <AfspraakFormulier afspraak={afspraak} datum={blad.datum} sluit={() => zetBlad(null)} />}
+      {blad?.soort === "afspraak" && <AfspraakFormulier afspraak={afspraak} datum={blad.datum} origineel={blad.origineel} sluit={() => zetBlad(null)} />}
     </>
   );
 }

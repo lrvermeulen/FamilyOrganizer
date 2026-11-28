@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { keerOp, splitsAfspraak, veldenVan, verwijderAfspraak, wijzigAfspraak } from "./afspraken";
 import { afdelingVan } from "./boodschappen";
 import {
   AfspraakSchema,
@@ -93,8 +94,29 @@ export const ActieSchema = z.discriminatedUnion("type", [
     /** true: het hele pakket (denkwerk én uitvoeren). false: alleen het denkwerk. */
     heelPakket: z.boolean().default(true),
   }),
-  z.object({ type: z.literal("afspraak.opslaan"), afspraak: AfspraakInvoer }),
-  z.object({ type: z.literal("afspraak.verwijderen"), id: Id }),
+  z.object({
+    type: z.literal("afspraak.opslaan"),
+    afspraak: AfspraakInvoer,
+    /** Bij een herhalende afspraak: welke keer (oorspronkelijke dag) en wat je aanpast. Standaard de hele reeks. */
+    origineel: Datum.optional(),
+    bereik: z.enum(["deze", "volgende", "reeks"]).default("reeks"),
+  }),
+  z.object({
+    type: z.literal("afspraak.verwijderen"),
+    id: Id,
+    origineel: Datum.optional(),
+    bereik: z.enum(["deze", "volgende", "reeks"]).default("reeks"),
+  }),
+  z.object({
+    type: z.literal("afspraak.ritten"),
+    id: Id,
+    origineel: Datum,
+    bereik: z.enum(["deze", "volgende", "reeks"]).default("deze"),
+    brengt: Id.nullable(),
+    haalt: Id.nullable(),
+    /** Alleen voor deze kinderen (de afspraak wordt dan gesplitst). Leeg of weggelaten: voor iedereen. */
+    voor: z.array(Id).max(12).optional(),
+  }),
   z.object({
     type: z.literal("agenda.opslaan"),
     // Een leeg adres bij een bestaande agenda: het oude adres houden.
@@ -337,7 +359,12 @@ export function pasToe(oud: Staat, ruweActie: unknown, ctx: Context): Staat {
       } else {
         const rol = v.soort === "brengen" ? "brengt" : "haalt";
         const afspraak = v.afspraakId ? staat.afspraken.find((a) => a.id === v.afspraakId) : undefined;
-        if (afspraak) afspraak[rol] = v.aan;
+        if (afspraak) {
+          // Alleen die ene keer (bij een reeks), niet elke week.
+          const keer = keerOp(afspraak, v.origineel ?? v.datum);
+          if (keer) wijzigAfspraak(staat, afspraak, keer.origineel, "deze", { velden: { ...keer.velden, [rol]: v.aan }, datum: keer.datum }, ctx.nieuwId);
+          else afspraak[rol] = v.aan;
+        }
         else if (v.regelSleutel) {
           const r = staat.externRegelingen.find((x) => x.sleutel === v.regelSleutel);
           if (r) r[rol] = v.aan;
@@ -390,15 +417,37 @@ export function pasToe(oud: Staat, ruweActie: unknown, ctx: Context): Staat {
       if (afspraak.haalVan && (!afspraak.eind || !afspraak.begin || afspraak.haalVan <= afspraak.begin || afspraak.haalVan > afspraak.eind)) {
         throw new ActieFout("Ophalen vanaf moet tussen de begin- en eindtijd liggen");
       }
-      const i = staat.afspraken.findIndex((x) => x.id === afspraak.id);
-      if (i >= 0) staat.afspraken[i] = afspraak;
-      else staat.afspraken.push(afspraak);
+      if (!bestaand) {
+        staat.afspraken.push(afspraak);
+        break;
+      }
+      // Een bestaande afspraak: bij een reeks alleen deze keer, deze en volgende, of de hele reeks.
+      wijzigAfspraak(
+        staat,
+        bestaand,
+        actie.origineel ?? bestaand.datum,
+        actie.bereik,
+        { velden: veldenVan(afspraak), datum: afspraak.datum, herhaling: afspraak.herhaling, school: afspraak.school },
+        ctx.nieuwId,
+      );
       break;
     }
     case "afspraak.verwijderen":
-      vind(staat.afspraken, actie.id, "Afspraak");
-      staat.afspraken = staat.afspraken.filter((a) => a.id !== actie.id);
+      verwijderAfspraak(staat, vind(staat.afspraken, actie.id, "Afspraak"), actie.origineel, actie.bereik);
       break;
+    case "afspraak.ritten": {
+      const a = vind(staat.afspraken, actie.id, "Afspraak");
+      controleerLid(staat, actie.brengt);
+      controleerLid(staat, actie.haalt);
+      const rollen = { brengt: actie.brengt, haalt: actie.haalt };
+      if (actie.voor?.length) splitsAfspraak(staat, a, actie.origineel, actie.bereik, actie.voor, rollen, ctx.nieuwId);
+      else {
+        const keer = keerOp(a, actie.origineel);
+        if (!keer) throw new ActieFout("Deze keer bestaat niet (meer)");
+        wijzigAfspraak(staat, a, actie.origineel, actie.bereik, { velden: { ...keer.velden, ...rollen }, datum: keer.datum }, ctx.nieuwId);
+      }
+      break;
+    }
     case "agenda.opslaan": {
       const g = actie.agenda;
       controleerLid(staat, g.lid);

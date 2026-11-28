@@ -16,7 +16,7 @@ export function Agenda({
   kop = true,
 }: {
   nieuweAfspraak: (datum: string) => void;
-  bewerkAfspraak: (id: string) => void;
+  bewerkAfspraak: (id: string, origineel?: string) => void;
   naarTab: (t: string) => void;
   kop?: boolean;
 }) {
@@ -118,7 +118,7 @@ export function Agenda({
             {vandeDag.length === 0 && <div className="stil klein" style={{ margin: "0 2px 6px" }}>—</div>}
             {vandeDag.map((item) => (
               <div key={item.sleutel}>
-                <ItemRegel item={item} klik={item.soort === "afspraak" ? () => bewerkAfspraak(item.refId) : undefined} />
+                <ItemRegel item={item} klik={item.soort === "afspraak" ? () => bewerkAfspraak(item.refId, item.origineel) : undefined} />
                 {botsingen.has(item.sleutel) && (
                   <div className="label fout" style={{ margin: "-2px 0 6px 62px" }}>
                     Valt samen met iets anders

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { Bereik } from "@/lib/afspraken";
 import { betreft, ritRollen, type AgendaItem } from "@/lib/agenda";
-import { alleItems, bordDag, brengHaalNodig, ritOpen, weekstart, weekVoorWeekstart } from "@/lib/bord";
+import { alleItems, bordDag, brengHaalNodig, groepeer, ritOpen, weekstart, weekVoorWeekstart } from "@/lib/bord";
 import { dag, kortLabel, langLabel, maandagVan, plusDagen, vandaag as vandaagDatum, WEEKDAG_KORT, WEEKDAG_LANG } from "@/lib/datum";
 import { openVoorvallen, uitvoerderVanKeer, type Voorval } from "@/lib/taken";
 import type { Staat, Taak } from "@/lib/types";
@@ -14,7 +15,7 @@ import { MaaltijdBlad } from "./Lijsten";
 import { useExtern } from "./useExtern";
 import { AanDeSlag } from "./AanDeSlag";
 import { ItemRegel, TaakRegel, VoorvalBlad, VraagKnop } from "./Regels";
-import { Blad, Bolletje, Keuzes } from "./ui";
+import { Blad, Bolletje, Keuzes, LedenKeuze } from "./ui";
 
 function naam(staat: Staat, id: string | null | undefined) {
   return staat.leden.find((l) => l.id === id)?.naam;
@@ -126,21 +127,38 @@ export function BordRaster({
 }
 
 /** Kiezen wie brengt en wie haalt. */
-function RitBlad({ item, sluit }: { item: AgendaItem; sluit: () => void }) {
+/** Kiezen wie brengt en wie haalt; bij een reeks voor welke keren, en bij meerdere kinderen voor wie. */
+function RitBlad({ item, sluit }: { item: AgendaItem & { groep?: AgendaItem[] }; sluit: () => void }) {
   const { staat, doe, bezig } = useGezin();
+  const delen = item.groep ?? [item];
   const [brengt, zetBrengt] = useState<string | null>(item.brengt ?? null);
   const [haalt, zetHaalt] = useState<string | null>(item.haalt ?? null);
-  const afspraak = item.soort === "afspraak" ? staat.afspraken.find((a) => a.id === item.refId) : undefined;
+  const kinderen = item.leden.filter((l) => staat.leden.find((x) => x.id === l)?.rol === "kind");
+  const [voor, zetVoor] = useState<string[]>(kinderen);
+  const reeks = delen.some((d) => d.reeks);
+  const [bereik, zetBereik] = useState<Bereik>("deze");
+  const extern = delen.some((d) => d.soort !== "afspraak");
   const opties = [
     ...staat.leden.filter((l) => l.rol === "ouder").map((l) => ({ waarde: l.id as string | null, label: l.naam })),
     { waarde: null, label: "Nog niemand / iemand anders" },
   ];
   const opslaan = async () => {
-    const ok = afspraak
-      ? await doe({ type: "afspraak.opslaan", afspraak: { ...afspraak, brengt, haalt } })
-      : await doe({ type: "extern.regelen", sleutel: item.regelSleutel ?? item.sleutel, datum: item.datum, titel: item.titel, leden: item.leden, brengt, haalt });
-    if (ok) sluit();
+    for (const d of delen) {
+      let ok = true;
+      if (d.soort === "afspraak") {
+        // Geldt de wijziging maar voor een deel van de kinderen van deze afspraak? Dan splitst de app hem.
+        const hier = d.leden.filter((l) => voor.includes(l));
+        if (!hier.length) continue;
+        const deel = hier.length < d.leden.filter((l) => kinderen.includes(l)).length;
+        ok = await doe({ type: "afspraak.ritten", id: d.refId, origineel: d.origineel ?? d.datum, bereik, brengt, haalt, voor: deel ? hier : undefined });
+      } else {
+        ok = await doe({ type: "extern.regelen", sleutel: d.regelSleutel ?? d.sleutel, datum: d.datum, titel: d.titel, leden: d.leden, brengt, haalt });
+      }
+      if (!ok) return;
+    }
+    sluit();
   };
+  const eerste = delen[0];
   return (
     <Blad titel={`${item.titel} · ${kortLabel(item.datum)}`} sluit={sluit}>
       <p className="stil klein">
@@ -148,6 +166,23 @@ function RitBlad({ item, sluit }: { item: AgendaItem; sluit: () => void }) {
         {item.eind ? `–${item.eind}` : ""} · {item.leden.map((l) => naam(staat, l)).join(", ")}
         {item.bron ? ` · uit ${item.bron}` : ""}
       </p>
+      {kinderen.length > 1 && !extern && (
+        <>
+          <div className="veld-label" style={{ marginTop: 10 }}>
+            Voor wie?
+          </div>
+          <LedenKeuze
+            leden={staat.leden.filter((l) => kinderen.includes(l.id))}
+            gekozen={voor}
+            wissel={(id) => zetVoor((v) => (v.includes(id) ? (v.length > 1 ? v.filter((x) => x !== id) : v) : [...v, id]))}
+          />
+          {voor.length < kinderen.length && (
+            <p className="stil klein" style={{ marginTop: 4 }}>
+              Alleen voor {voor.map((l) => naam(staat, l)).join(" en ")}: die krijgt een eigen regel op het bord.
+            </p>
+          )}
+        </>
+      )}
       {ritRollen(item).includes("brengt") && (
         <>
           <div className="veld-label" style={{ marginTop: 10 }}>
@@ -173,10 +208,22 @@ function RitBlad({ item, sluit }: { item: AgendaItem; sluit: () => void }) {
           <Keuzes label="Haalt" waarde={haalt} kies={zetHaalt} opties={opties} />
         </>
       )}
-      {afspraak && afspraak.herhaling.soort !== "geen" && (
-        <p className="stil klein" style={{ marginTop: 10 }}>
-          Dit geldt voor elke keer van deze afspraak.
-        </p>
+      {reeks && (
+        <>
+          <div className="veld-label" style={{ marginTop: 12 }}>
+            Voor welke keren?
+          </div>
+          <Keuzes
+            label="Welke keren"
+            waarde={bereik}
+            kies={zetBereik}
+            opties={[
+              { waarde: "deze", label: `Alleen ${kortLabel(item.datum)}` },
+              { waarde: "volgende", label: "Deze en volgende" },
+              { waarde: "reeks", label: "Hele reeks" },
+            ]}
+          />
+        </>
       )}
       <div className="blad-voet">
         <span />
@@ -185,7 +232,7 @@ function RitBlad({ item, sluit }: { item: AgendaItem; sluit: () => void }) {
         </button>
       </div>
       <div className="stapel" style={{ marginTop: 14 }}>
-        <div className="veld-label">Of vraag het de ander</div>
+        <div className="veld-label">Of vraag het de ander (voor {kortLabel(item.datum)})</div>
         <div className="rij">
           {(["brengen", "halen"] as const).filter((rol) => ritRollen(item).includes(rol === "brengen" ? "brengt" : "haalt")).map((rol) => (
             <VraagKnop
@@ -198,9 +245,10 @@ function RitBlad({ item, sluit }: { item: AgendaItem; sluit: () => void }) {
                 soort: rol,
                 titel: item.titel,
                 datum: item.datum,
-                tijd: rol === "brengen" ? item.begin : (item.eind ?? item.begin),
-                afspraakId: afspraak?.id,
-                regelSleutel: afspraak ? undefined : (item.regelSleutel ?? item.sleutel),
+                origineel: eerste.origineel,
+                tijd: rol === "brengen" ? item.begin : (item.haalVan ?? item.eind ?? item.begin),
+                afspraakId: eerste.soort === "afspraak" ? eerste.refId : undefined,
+                regelSleutel: eerste.soort === "afspraak" ? undefined : (eerste.regelSleutel ?? eerste.sleutel),
                 leden: item.leden,
                 bericht,
               })}
@@ -255,8 +303,8 @@ function DagWeergave({
   const routines = openVoorvallen(staat, vandaag, datum > vandaag ? datum : vandaag).filter(
     (v) => v.taak.herhaling.soort === "dagelijks" && v.datum === datum && mijnTaak(v),
   );
-  const metIets = staat.leden.filter((l) => b.perLid[l.id].length > 0);
-  const heleGezin = items.filter((i) => i.datum === datum && i.soort !== "taak" && i.leden.length === 0);
+  // Eén regel per afspraak; gelijke afspraken voor meerdere kinderen samen.
+  const regels = groepeer(items.filter((i) => i.datum === datum && i.soort !== "taak" && mijnItem(i)));
 
   return (
     <>
@@ -270,19 +318,16 @@ function DagWeergave({
 
       <div className="kaart">
         <h3>Wie moet waarheen</h3>
-        {metIets.length === 0 && heleGezin.length === 0 && <p className="stil">Niets in de agenda.</p>}
-        {metIets.map((l) => (
-          <div key={l.id} style={{ marginTop: 10 }}>
-            <div className="rij" style={{ marginBottom: 4 }}>
-              <Bolletje lid={l} klein /> <b>{l.naam}</b>
-            </div>
-            {b.perLid[l.id].map((i) => (
-              <div key={i.sleutel}>
-                <ItemRegel item={i} klik={() => openItem(i)} zonderRit={brengHaalNodig(i, staat)} />
-                <RitRegel item={i} open={() => openRit(i)} />
-                {b.botsingen.has(i.sleutel) && <div className="label fout" style={{ margin: "-2px 0 6px" }}>Valt samen met iets anders</div>}
+        {regels.length === 0 && <p className="stil">Niets in de agenda.</p>}
+        {regels.map((g) => (
+          <div key={g.sleutel} style={{ marginTop: 6 }}>
+            <ItemRegel item={g} klik={() => openItem(g.groep[0])} zonderRit={brengHaalNodig(g, staat)} />
+            <RitRegel item={g} open={() => openRit(g)} />
+            {g.groep.some((i) => b.botsingen.has(i.sleutel)) && (
+              <div className="label fout" style={{ margin: "-2px 0 6px" }}>
+                Valt samen met iets anders
               </div>
-            ))}
+            )}
           </div>
         ))}
       </div>
@@ -469,7 +514,7 @@ function WeekstartBlad({ sluit, naarTab }: { sluit: () => void; naarTab: (t: str
   );
 }
 
-export function Bord({ naarTab, bewerkAfspraak, nieuweAfspraak }: { naarTab: (t: string) => void; bewerkAfspraak: (id: string) => void; nieuweAfspraak: (datum: string) => void }) {
+export function Bord({ naarTab, bewerkAfspraak, nieuweAfspraak }: { naarTab: (t: string) => void; bewerkAfspraak: (id: string, origineel?: string) => void; nieuweAfspraak: (datum: string) => void }) {
   const { staat, ikLid } = useGezin();
   const vandaag = vandaagDatum();
   const [stand, zetStand] = useState<"dag" | "week" | "lijst">("dag");
@@ -506,7 +551,7 @@ export function Bord({ naarTab, bewerkAfspraak, nieuweAfspraak }: { naarTab: (t:
   const weekdag = dag(vandaag).weekday;
 
   const openItem = (i: AgendaItem) => {
-    if (i.soort === "afspraak") bewerkAfspraak(i.refId);
+    if (i.soort === "afspraak") bewerkAfspraak(i.refId, i.origineel);
     else if (brengHaalNodig(i, staat)) zetRit(i);
   };
 

@@ -120,6 +120,35 @@ export const VoltooiingSchema = z.object({
 });
 export type Voltooiing = z.infer<typeof VoltooiingSchema>;
 
+/** De velden van een afspraak die per keer kunnen afwijken. */
+export const AfspraakVeldenSchema = z.object({
+  titel: z.string().trim().min(1).max(120),
+  heleDag: z.boolean(),
+  begin: Klok.optional(),
+  eind: Klok.optional(),
+  leden: z.array(Id).min(1),
+  regelaar: Id.nullable(),
+  brengt: Id.nullable(),
+  haalt: Id.nullable(),
+  haalVan: Klok.optional(),
+  locatie: z.string().max(200),
+  notitie: z.string().max(2000),
+});
+export type AfspraakVelden = z.infer<typeof AfspraakVeldenSchema>;
+
+/** Eén keer van een herhalende afspraak die anders is: verzet, aangepast of vervallen. */
+export const AfwijkingSchema = z.object({
+  /** De oorspronkelijke dag van deze keer. */
+  datum: Datum,
+  /** Deze keer vervalt. */
+  vervalt: z.boolean().default(false),
+  /** Verzet naar een andere dag. */
+  naar: Datum.optional(),
+  /** Hoe deze keer eruitziet (alle velden, zodat latere wijzigingen aan de reeks deze keer niet raken). */
+  velden: AfspraakVeldenSchema.optional(),
+});
+export type Afwijking = z.infer<typeof AfwijkingSchema>;
+
 export const AfspraakSchema = z.object({
   id: Id,
   titel: z.string().trim().min(1).max(120),
@@ -141,6 +170,8 @@ export const AfspraakSchema = z.object({
   locatie: z.string().max(200).default(""),
   notitie: z.string().max(2000).default(""),
   herhaling: HerhalingSchema,
+  /** Keren die afwijken van de reeks. */
+  afwijkingen: z.array(AfwijkingSchema).default([]),
   aangemaaktDoor: Id,
   aangemaaktOp: z.string(),
 });

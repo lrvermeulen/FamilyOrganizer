@@ -1,3 +1,4 @@
+import { keren } from "./afspraken";
 import { geenSchool } from "./agenda";
 import { dagenTussen, maandagVan, minutenTussen, plusDagen } from "./datum";
 import { perWeek, voorvallen } from "./herhaling";
@@ -207,16 +208,18 @@ export function berekenInzicht(staat: Staat, van: string, tot: string, vandaag: 
 
   // Afspraken in de app: regelen, brengen, halen
   for (const a of staat.afspraken) {
-    for (const datum of voorvallen(a.datum, a.herhaling, van, eind)) {
-      if (a.school && geenSchool(staat, datum, a.leden)) continue; // vakantie of studiedag
-      if (a.regelaar) onzichtbaar(a.regelaar, PUNTEN_AFSPRAAK, datum, "denkwerk", "regelen");
-      if (a.brengt || a.haalt) {
-        for (const r of [a.brengt, a.haalt]) {
+    for (const k of keren(a, van, eind)) {
+      const datum = k.datum;
+      const v = k.velden;
+      if (a.school && geenSchool(staat, datum, v.leden)) continue; // vakantie of studiedag
+      if (v.regelaar) onzichtbaar(v.regelaar, PUNTEN_AFSPRAAK, datum, "denkwerk", "regelen");
+      if (v.brengt || v.haalt) {
+        for (const r of [v.brengt, v.haalt]) {
           doe(r, REIS_MIN, datum);
           if (r && ouderIds.has(r)) per.get(r)!.ritten += 1;
         }
-      } else if (a.regelaar) {
-        doe(a.regelaar, !a.heleDag && a.begin && a.eind ? minutenTussen(a.begin, a.eind) : 0, datum);
+      } else if (v.regelaar) {
+        doe(v.regelaar, !v.heleDag && v.begin && v.eind ? minutenTussen(v.begin, v.eind) : 0, datum);
       }
     }
   }

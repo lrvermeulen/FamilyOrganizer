@@ -141,3 +141,23 @@ export function weekstart(staat: Staat, items: AgendaItem[], maandag: string, va
 export function vanLid(items: AgendaItem[], lid: string): AgendaItem[] {
   return items.filter((i) => betreft(i, lid));
 }
+
+/** Een regel op het bord: één afspraak, of gelijke afspraken voor meerdere kinderen samen. */
+export type Groep = AgendaItem & { groep: AgendaItem[] };
+
+/**
+ * Afspraken die helemaal gelijk zijn (zelfde dag, tijden, titel, brenger en haler) als één regel,
+ * met alle kinderen erbij. Wat per kind verschilt, blijft apart staan.
+ */
+export function groepeer(items: AgendaItem[]): Groep[] {
+  const groepen = new Map<string, Groep>();
+  for (const i of items) {
+    const k = [i.soort, i.datum, i.heleDag, i.begin, i.eind, i.titel, i.brengt ?? "", i.haalt ?? "", i.rit ?? "", i.bron ?? ""].join("|");
+    const g = groepen.get(k);
+    if (g) {
+      if (!g.groep.some((x) => x.sleutel === i.sleutel)) g.groep.push(i);
+      g.leden = [...new Set([...g.leden, ...i.leden])];
+    } else groepen.set(k, { ...i, groep: [i] });
+  }
+  return [...groepen.values()];
+}
