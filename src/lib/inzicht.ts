@@ -1,3 +1,4 @@
+import { geenSchool } from "./agenda";
 import { dagenTussen, maandagVan, minutenTussen, plusDagen } from "./datum";
 import { perWeek, voorvallen } from "./herhaling";
 import { uitvoerderVan, voorvallenInPeriode } from "./taken";
@@ -207,6 +208,7 @@ export function berekenInzicht(staat: Staat, van: string, tot: string, vandaag: 
   // Afspraken in de app: regelen, brengen, halen
   for (const a of staat.afspraken) {
     for (const datum of voorvallen(a.datum, a.herhaling, van, eind)) {
+      if (a.school && geenSchool(staat, datum, a.leden)) continue; // vakantie of studiedag
       if (a.regelaar) onzichtbaar(a.regelaar, PUNTEN_AFSPRAAK, datum, "denkwerk", "regelen");
       if (a.brengt || a.haalt) {
         for (const r of [a.brengt, a.haalt]) {

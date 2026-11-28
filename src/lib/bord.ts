@@ -1,4 +1,4 @@
-import { appItems, betreft, metRegelingen, overlapt, sorteer, type AgendaItem } from "./agenda";
+import { appItems, betreft, geenSchool, metRegelingen, overlapt, ritRollen, sorteer, type AgendaItem } from "./agenda";
 import { maandagVan, plusDagen } from "./datum";
 import { openVoorvallen, uitvoerderVanKeer, type Voorval } from "./taken";
 import type { Maaltijd, Staat } from "./types";
@@ -6,7 +6,15 @@ import { vakantieOp, type Vakantie } from "./vakanties";
 
 /** Alles voor [van, tot] bij elkaar: afspraken uit de app, gekoppelde agenda's en ingeplande taken. */
 export function alleItems(staat: Staat, extern: AgendaItem[], van: string, tot: string): AgendaItem[] {
-  return sorteer([...appItems(staat, van, tot), ...metRegelingen(extern, staat)].filter((i) => i.datum >= van && i.datum <= tot));
+  const ext = metRegelingen(extern, staat);
+  // Studiedagen uit gekoppelde agenda's (bijvoorbeeld Social Schools) laten school ook vervallen.
+  const app = appItems(staat, van, tot).filter((i) => !i.school || !geenSchool(staat, i.datum, i.leden, ext));
+  return sorteer([...app, ...ext].filter((i) => i.datum >= van && i.datum <= tot));
+}
+
+/** Staat er bij een afspraak nog een rol open (brengen of halen) die ertoe doet? */
+export function ritOpen(item: AgendaItem, staat: Staat): boolean {
+  return brengHaalNodig(item, staat) && ritRollen(item).some((r) => !item[r]);
 }
 
 /** Moet er iemand brengen en halen? Bij een afspraak met tijd voor een kind. */
@@ -54,7 +62,7 @@ export function bordDag(staat: Staat, items: AgendaItem[], datum: string, vandaa
     perLid,
     taken,
     takenPerLid,
-    openRitten: vanDag.filter((i) => brengHaalNodig(i, staat) && (!i.brengt || !i.haalt)),
+    openRitten: vanDag.filter((i) => ritOpen(i, staat)),
     botsingen: botsingen(vanDag),
   };
 }
@@ -119,7 +127,7 @@ export function weekstart(staat: Staat, items: AgendaItem[], maandag: string, va
   return {
     maandag,
     teDoen,
-    openRitten: week.filter((i) => brengHaalNodig(i, staat) && (!i.brengt || !i.haalt)),
+    openRitten: week.filter((i) => ritOpen(i, staat)),
     botsingen: week.filter((i) => bots.has(i.sleutel)),
     dagenZonderEten: dagen.filter((d) => !staat.maaltijden.some((m) => m.datum === d && m.wat)),
     takenZonderEigenaar: staat.taken.filter((t) => !t.gearchiveerd && !t.eigenaar).length,

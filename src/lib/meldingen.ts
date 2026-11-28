@@ -1,4 +1,4 @@
-import type { AgendaItem } from "./agenda";
+import { ritRollen, type AgendaItem } from "./agenda";
 import { bordTaken } from "./bord";
 import { minutenTussen } from "./datum";
 import { openVoorvallen, uitvoerderVanKeer } from "./taken";
@@ -35,7 +35,9 @@ function ritTekst(staat: Staat, item: AgendaItem, lid: string): string {
   const kind = item.leden.some((l) => staat.leden.find((x) => x.id === l)?.rol === "kind");
   if (!kind || item.heleDag || !item.begin) return "";
   const wie = (x: string | null | undefined) => (x === lid ? "jij" : (naam(staat, x) ?? "nog niemand"));
-  return ` (brengt: ${wie(item.brengt)}, haalt: ${wie(item.haalt)})`;
+  return ` (${ritRollen(item)
+    .map((r) => `${r === "brengt" ? "brengt" : "haalt"}: ${wie(item[r])}`)
+    .join(", ")})`;
 }
 
 /** De ochtendbriefing voor één ouder: de dag van het hele gezin, plus eten en wat jij niet moet vergeten. */
@@ -85,20 +87,33 @@ export function teVersturen(
     if (ins.herinneringMin !== null) {
       for (const i of items) {
         if (i.datum !== datum || i.heleDag || !i.begin || i.soort === "taak") continue;
-        const mijn = [i.regelaar, i.brengt, i.haalt].includes(ouder.id) || i.leden.includes(ouder.id);
-        if (!mijn) continue;
-        const start = minuut(i.begin);
-        // Herinneren in het venster [start - herinneringMin, start).
-        if (nu >= start - ins.herinneringMin && nu < start) {
-          const over = minutenTussen(klok, i.begin);
-          const rol = i.brengt === ouder.id ? "Jij brengt. " : i.haalt === ouder.id ? `Jij haalt${i.eind ? ` om ${i.eind}` : ""}. ` : "";
-          voeg({
-            lid: ouder.id,
-            sleutel: `herinnering|${ouder.id}|${i.sleutel}`,
-            titel: `Over ${over} min: ${i.titel}`,
-            tekst: `${rol}${i.begin}${i.locatie ? ` · ${i.locatie}` : ""}${i.leden.length ? ` · ${i.leden.map((l) => naam(staat, l)).join(", ")}` : ""}`,
-            url: "/#bord",
-          });
+        const kinderen = i.leden.map((l) => naam(staat, l)).filter(Boolean).join(" en ");
+        // Per moment herinneren: bij het begin (erbij zijn, regelen, brengen) en bij het ophalen (halen).
+        const momenten: { klok: string; titel: string; tekst: string; soort: string }[] = [];
+        const eind = i.eind ?? i.begin;
+        const haalMoment = i.haalVan ?? eind;
+        if (i.rit === "halen" && i.haalt === ouder.id) {
+          momenten.push({ klok: i.begin, titel: `${i.titel}`, tekst: `Jij haalt ${kinderen}.`, soort: "halen" });
+        } else {
+          if (i.brengt === ouder.id) momenten.push({ klok: i.begin, titel: `${kinderen} brengen (${i.titel})`, tekst: `Jij brengt.`, soort: "brengen" });
+          else if (i.regelaar === ouder.id || i.leden.includes(ouder.id)) momenten.push({ klok: i.begin, titel: i.titel, tekst: "", soort: "begin" });
+          if (i.haalt === ouder.id && !i.rit) {
+            const tussen = i.haalVan ? `tussen ${i.haalVan} en ${eind}` : `om ${eind}`;
+            momenten.push({ klok: haalMoment, titel: `${kinderen} halen (${i.titel})`, tekst: `Jij haalt, ${tussen}.`, soort: "halen" });
+          }
+        }
+        for (const m of momenten) {
+          const start = minuut(m.klok);
+          // Herinneren in het venster [moment - herinneringMin, moment).
+          if (nu >= start - ins.herinneringMin && nu < start) {
+            voeg({
+              lid: ouder.id,
+              sleutel: `herinnering|${ouder.id}|${i.sleutel}|${m.soort}`,
+              titel: `Over ${minutenTussen(klok, m.klok)} min: ${m.titel}`,
+              tekst: [m.tekst, i.locatie].filter(Boolean).join(" · ") || m.klok,
+              url: "/#bord",
+            });
+          }
         }
       }
     }

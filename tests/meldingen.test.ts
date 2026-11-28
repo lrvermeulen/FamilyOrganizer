@@ -70,7 +70,7 @@ describe("herinneringen", () => {
     const items = alleItems(s, [], DATUM, DATUM);
     const h = (klok: string) => teVersturen(s, items, DATUM, klok, new Set(), iedereen).filter((m) => m.sleutel.startsWith("herinnering"));
     expect(h("14:55")).toHaveLength(0);
-    expect(h("15:05")).toEqual([expect.objectContaining({ lid: "a", titel: "Over 25 min: Zwemles", tekst: "Jij brengt. 15:30 · Kim" })]);
+    expect(h("15:05")).toEqual([expect.objectContaining({ lid: "a", titel: "Over 25 min: Kim brengen (Zwemles)", tekst: "Jij brengt." })]);
     expect(h("15:30")).toHaveLength(0);
   });
 

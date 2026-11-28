@@ -2,7 +2,7 @@ import ICAL from "ical.js";
 import { DateTime } from "luxon";
 import type { AgendaItem } from "../agenda";
 import { alsDatum, TIJDZONE } from "../datum";
-import { herkenLeden } from "../leden";
+import { herkenLeden, ritIn, type Rit } from "../leden";
 import type { ExterneAgenda, Lid } from "../types";
 
 const MAX_VOORVALLEN = 2000;
@@ -39,9 +39,24 @@ export function leesIcs(tekst: string, agenda: ExterneAgenda, van: string, tot: 
    * Voor wie is een afspraak? Namen of letters in de titel ("S judo") gaan voor.
    * Anders: de eigenaar van de agenda, of bij een gezinsagenda de ouders.
    */
-  const voorWie = (titel: string) => {
+  const kind = (id: string) => leden.find((l) => l.id === id)?.rol === "kind";
+  const voorWie = (titel: string): { leden: string[]; titel: string; rit?: Rit; brengt?: string | null; haalt?: string | null } => {
     if (agenda.alleenBezet) return { leden: agenda.lid ? [agenda.lid] : ouders, titel: "Bezet" };
     const h = herkenLeden(titel, leden);
+    const kinderen = h.leden.filter(kind);
+    const rit = ritIn(h.titel);
+    if (rit && kinderen.length) {
+      // "S&T naar school brengen" in de agenda van Lau: Lau brengt Stijn en Tobias.
+      // "L brengt S" in een gezinsagenda: de genoemde ouder brengt.
+      const door = h.leden.find((l) => !kind(l)) ?? (agenda.lid && !kind(agenda.lid) ? agenda.lid : null);
+      return {
+        leden: kinderen,
+        titel: h.titel || titel,
+        rit,
+        brengt: rit !== "halen" ? door : null,
+        haalt: rit !== "brengen" ? door : null,
+      };
+    }
     return { leden: h.leden.length ? h.leden : agenda.lid ? [agenda.lid] : ouders, titel: h.titel || titel };
   };
   const jcal = ICAL.parse(tekst);
@@ -97,6 +112,7 @@ export function leesIcs(tekst: string, agenda: ExterneAgenda, van: string, tot: 
         refId: agenda.id,
         bron: agenda.naam,
         regelSleutel: `${agenda.id}|${uid}|${datum}`,
+        ...(wie.rit ? { rit: wie.rit, brengt: wie.brengt ?? null, haalt: wie.haalt ?? null } : {}),
       });
     }
   };

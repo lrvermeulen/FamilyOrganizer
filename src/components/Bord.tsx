@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { betreft, type AgendaItem } from "@/lib/agenda";
-import { alleItems, bordDag, brengHaalNodig, weekstart, weekVoorWeekstart } from "@/lib/bord";
+import { betreft, ritRollen, type AgendaItem } from "@/lib/agenda";
+import { alleItems, bordDag, brengHaalNodig, ritOpen, weekstart, weekVoorWeekstart } from "@/lib/bord";
 import { dag, kortLabel, langLabel, maandagVan, plusDagen, vandaag as vandaagDatum, WEEKDAG_KORT, WEEKDAG_LANG } from "@/lib/datum";
 import { openVoorvallen, uitvoerderVanKeer, type Voorval } from "@/lib/taken";
 import type { Staat, Taak } from "@/lib/types";
@@ -72,7 +72,8 @@ export function BordRaster({
                         <span className="tijd">{it.heleDag || !it.begin ? "" : it.begin}</span> {it.titel}
                         {brengHaalNodig(it, staat) && (
                           <span className="rit">
-                            {it.brengt ? `↗ ${naam(staat, it.brengt)}` : "↗ ?"} {it.haalt ? `↙ ${naam(staat, it.haalt)}` : "↙ ?"}
+                            {ritRollen(it).includes("brengt") && (it.brengt ? `↗ ${naam(staat, it.brengt)} ` : "↗ ? ")}
+                            {ritRollen(it).includes("haalt") && (it.haalt ? `↙ ${naam(staat, it.haalt)}` : "↙ ?")}
                           </span>
                         )}
                         {b.botsingen.has(it.sleutel) && <span className="label fout">tegelijk</span>}
@@ -147,14 +148,22 @@ function RitBlad({ item, sluit }: { item: AgendaItem; sluit: () => void }) {
         {item.eind ? `–${item.eind}` : ""} · {item.leden.map((l) => naam(staat, l)).join(", ")}
         {item.bron ? ` · uit ${item.bron}` : ""}
       </p>
-      <div className="veld-label" style={{ marginTop: 10 }}>
-        Wie brengt?
-      </div>
-      <Keuzes label="Brengt" waarde={brengt} kies={zetBrengt} opties={opties} />
-      <div className="veld-label" style={{ marginTop: 12 }}>
-        Wie haalt?
-      </div>
-      <Keuzes label="Haalt" waarde={haalt} kies={zetHaalt} opties={opties} />
+      {ritRollen(item).includes("brengt") && (
+        <>
+          <div className="veld-label" style={{ marginTop: 10 }}>
+            Wie brengt?
+          </div>
+          <Keuzes label="Brengt" waarde={brengt} kies={zetBrengt} opties={opties} />
+        </>
+      )}
+      {ritRollen(item).includes("haalt") && (
+        <>
+          <div className="veld-label" style={{ marginTop: 12 }}>
+            Wie haalt?
+          </div>
+          <Keuzes label="Haalt" waarde={haalt} kies={zetHaalt} opties={opties} />
+        </>
+      )}
       {afspraak && afspraak.herhaling.soort !== "geen" && (
         <p className="stil klein" style={{ marginTop: 10 }}>
           Dit geldt voor elke keer van deze afspraak.
@@ -169,7 +178,7 @@ function RitBlad({ item, sluit }: { item: AgendaItem; sluit: () => void }) {
       <div className="stapel" style={{ marginTop: 14 }}>
         <div className="veld-label">Of vraag het de ander</div>
         <div className="rij">
-          {(["brengen", "halen"] as const).map((rol) => (
+          {(["brengen", "halen"] as const).filter((rol) => ritRollen(item).includes(rol === "brengen" ? "brengt" : "haalt")).map((rol) => (
             <VraagKnop
               key={rol}
               label={(n) => `Vraag ${n} te ${rol}`}
@@ -199,8 +208,8 @@ function RitRegel({ item, open }: { item: AgendaItem; open: () => void }) {
   if (!brengHaalNodig(item, staat)) return null;
   return (
     <button className="ritregel" onClick={open}>
-      <span className={item.brengt ? "" : "open"}>Brengt: {naam(staat, item.brengt) ?? "?"}</span>
-      <span className={item.haalt ? "" : "open"}>Haalt: {naam(staat, item.haalt) ?? "?"}</span>
+      {ritRollen(item).includes("brengt") && <span className={item.brengt ? "" : "open"}>Brengt: {naam(staat, item.brengt) ?? "?"}</span>}
+      {ritRollen(item).includes("haalt") && <span className={item.haalt ? "" : "open"}>Haalt: {naam(staat, item.haalt) ?? "?"}</span>}
     </button>
   );
 }
@@ -227,7 +236,7 @@ function DagWeergave({
   const vandaag = vandaagDatum();
   const volledig = bordDag(staat, items, datum, vandaag);
   const mijnItem = (i: AgendaItem) =>
-    !alleenVan || betreft(i, alleenVan) || (brengHaalNodig(i, staat) && (!i.brengt || !i.haalt));
+    !alleenVan || betreft(i, alleenVan) || ritOpen(i, staat);
   const mijnTaak = (v: Voorval) => !alleenVan || uitvoerderVanKeer(staat, v) === alleenVan || !v.taak.eigenaar;
   const b = {
     ...volledig,

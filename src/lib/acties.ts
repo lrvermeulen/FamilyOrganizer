@@ -387,6 +387,9 @@ export function pasToe(oud: Staat, ruweActie: unknown, ctx: Context): Staat {
       if (afspraak.begin && afspraak.eind && afspraak.eind <= afspraak.begin) {
         throw new ActieFout("De eindtijd moet na de begintijd liggen");
       }
+      if (afspraak.haalVan && (!afspraak.eind || !afspraak.begin || afspraak.haalVan <= afspraak.begin || afspraak.haalVan > afspraak.eind)) {
+        throw new ActieFout("Ophalen vanaf moet tussen de begin- en eindtijd liggen");
+      }
       const i = staat.afspraken.findIndex((x) => x.id === afspraak.id);
       if (i >= 0) staat.afspraken[i] = afspraak;
       else staat.afspraken.push(afspraak);

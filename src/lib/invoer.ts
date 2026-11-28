@@ -1,8 +1,8 @@
 import { DateTime } from "luxon";
 import { splitsBoodschappen } from "./boodschappen";
 import { alsDatum, dag } from "./datum";
-import { herkenLeden } from "./leden";
-import type { Lid } from "./types";
+import { herkenLeden, ritIn, type Rit } from "./leden";
+import type { Herhaling, Lid } from "./types";
 
 /**
  * Begrijpt eenvoudige Nederlandse zinnen en geplakte berichten, zonder AI:
@@ -25,6 +25,19 @@ export interface Voorstel {
   datumGevonden: boolean;
   /** Het stuk tekst waar dit voorstel uit komt. */
   bron: string;
+  /** De afspraak is zelf een rit ("S&T naar school brengen"): wie het invoert, brengt of haalt. */
+  rit?: Rit;
+  /** Bij een rit: de ouder die in de tekst genoemd wordt als brenger of haler (anders wie het invoert). */
+  door?: string;
+  /** Vaste dagen ("ma do vr", "elke dinsdag", "ma t/m vr"): elke week op die dagen. */
+  herhaling?: Herhaling;
+  /** Uitdrukkelijk genoemd: "brengt Roos", "haalt Lau". */
+  brengt?: string;
+  haalt?: string;
+  /** "BSO tot 17:30": ophalen kan vanaf het einde van school tot dan. */
+  haalVan?: string;
+  /** School of opvang: vervalt in vakanties en op studiedagen. */
+  school?: boolean;
 }
 
 const MAANDEN: Record<string, number> = {
@@ -102,6 +115,30 @@ export function vindTijden(tekst: string): Gevonden {
     }
   }
   return g;
+}
+
+/**
+ * Vaste dagen in de week: "ma do vr", "ma, do en vr", "elke dinsdag", "di/wo", "ma t/m vr".
+ * Eén losse dag zonder "elke" is gewoon een datum, geen herhaling.
+ */
+export function vindWeekdagen(tekst: string): { dagen: number[]; stuk: string } | null {
+  const dag = `(${DAG_RE})\\.?`;
+  const bereik = new RegExp(`\\b${dag}\\s*(?:t\\/m|tot en met|-)\\s*${dag}(?![\\p{L}])`, "iu").exec(tekst);
+  if (bereik) {
+    const a = DAGEN[bereik[1].toLowerCase()];
+    const b = DAGEN[bereik[2].toLowerCase()];
+    if (a && b && b > a) return { dagen: Array.from({ length: b - a + 1 }, (_, i) => a + i), stuk: bereik[0] };
+  }
+  const scheiding = `(?:\\s*[,/&+]\\s*|\\s+en\\s+|\\s+)`;
+  const lijst = new RegExp(`(?:\\belke\\s+)?\\b${dag}(?:${scheiding}${dag}(?![\\p{L}]))+`, "giu");
+  for (const m of tekst.matchAll(lijst)) {
+    const dagen = [...m[0].matchAll(new RegExp(`\\b(${DAG_RE})(?![\\p{L}])`, "giu"))].map((x) => DAGEN[x[1].toLowerCase()]);
+    const uniek = [...new Set(dagen)].sort();
+    if (uniek.length >= 2) return { dagen: uniek, stuk: m[0] };
+  }
+  const elke = new RegExp(`\\belke\\s+${dag}(?![\\p{L}])`, "iu").exec(tekst);
+  if (elke) return { dagen: [DAGEN[elke[1].toLowerCase()]], stuk: elke[0] };
+  return null;
 }
 
 /** Zoek een datum. Zonder jaar en al voorbij: volgend jaar. Een weekdag: de eerstvolgende (vandaag telt mee). */
@@ -211,24 +248,75 @@ export function leesRegel(regel: string, opties: { vandaag: string; leden: Lid[]
       bron,
     };
   }
-  const d = vindDatum(bron, opties.vandaag);
-  const t = vindTijden(bron);
+  // "brengt Roos", "haalt L": wie brengt en haalt, uitdrukkelijk genoemd.
+  const rollen: { brengt?: string; haalt?: string; stukken: string[] } = { stukken: [] };
+  const ouderVan = (woord: string) =>
+    opties.leden.find((l) => l.rol === "ouder" && (l.naam.toLowerCase() === woord.toLowerCase() || l.code === woord || (!l.code && woord.length === 1 && woord === l.naam.charAt(0).toUpperCase())))?.id;
+  for (const [rol, re] of [
+    ["brengt", /\bbrengt\s+(\p{L}+)/iu],
+    ["haalt", /\bhaalt\s+(\p{L}+)/iu],
+  ] as const) {
+    const m = re.exec(bron);
+    const wie = m ? ouderVan(m[1]) : undefined;
+    if (m && wie) {
+      rollen[rol] = wie;
+      rollen.stukken.push(m[0]);
+    }
+  }
+  // "BSO tot 17:30": school tot het gewone einde, daarna opvang; ophalen tussen die twee tijden.
+  const bso = /\b(bso|naschoolse opvang|opvang)\s+tot\s+(\d{1,2})[:.](\d{2})/i.exec(bron);
+  const zonderBso = bso ? bron.replace(bso[0], " ") : bron;
+  const t = vindTijden(zonderBso);
+  const week = vindWeekdagen(bron);
+  // Bij vaste dagen: de eerste keer is de eerstvolgende van die dagen (vandaag telt mee).
+  const d: Gevonden = week
+    ? (() => {
+        const v = dag(opties.vandaag);
+        const verschil = Math.min(...week.dagen.map((x) => (x - v.weekday + 7) % 7));
+        return { datum: alsDatum(v.plus({ days: verschil })), stukken: [week.stuk] };
+      })()
+    : vindDatum(bron, opties.vandaag);
   const uiterlijk = UITERLIJK_RE.test(bron);
   const herkend = herkenLeden(bron, opties.leden);
-  const leden = herkend.leden;
+  let leden = herkend.leden;
   const soort: Voorstel["soort"] = uiterlijk ? "taak" : t.begin ? "afspraak" : d.datum && HELE_DAG_RE.test(bron) ? "afspraak" : d.datum ? "taak" : "taak";
+  let titelTekst = herkend.titel;
+  for (const stuk of rollen.stukken) titelTekst = titelTekst.replace(stuk, " ");
+  if (bso) titelTekst = titelTekst.replace(bso[0], " ");
+  const rol = (id: string) => opties.leden.find((l) => l.id === id)?.rol;
+  const kinderen = leden.filter((l) => rol(l) === "kind");
+  const uitdrukkelijk = !!(rollen.brengt || rollen.haalt);
+  const rit = kinderen.length && soort === "afspraak" && !uitdrukkelijk ? (ritIn(bron) ?? undefined) : undefined;
+  if (uitdrukkelijk) leden = kinderen.length ? kinderen : leden;
+  const school = soort === "afspraak" && kinderen.length > 0 && /\b(school|opvang|bso|kinderopvang|kdv|creche|crèche|peuterspeelzaal)\b/i.test(bron);
+  let door: string | undefined;
+  if (rit) {
+    // "S&T naar school brengen ma do vr 8:30 Roos": Roos brengt, de rit is voor de kinderen.
+    door = leden.find((l) => rol(l) === "ouder");
+    leden = kinderen;
+    const naam = opties.leden.find((l) => l.id === door)?.naam;
+    if (naam) titelTekst = titelTekst.replace(new RegExp(`(^|\\s)${naam.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}])`, "iu"), " ");
+  }
+  const basisTitel = maakTitel(titelTekst, [...d.stukken, ...t.stukken]) || bron.slice(0, 80);
   return {
     soort,
-    titel: maakTitel(herkend.titel, [...d.stukken, ...t.stukken]) || bron.slice(0, 80),
+    titel: bso && !/\b(bso|opvang)\b/i.test(basisTitel) ? `${basisTitel} en BSO` : basisTitel,
     datum: d.datum ?? opties.vandaag,
     heleDag: !t.begin,
     begin: t.begin,
-    eind: t.eind,
+    eind: bso && t.begin ? `${bso[2].padStart(2, "0")}:${bso[3]}` : t.eind,
+    haalVan: bso && t.eind ? t.eind : undefined,
+    brengt: rollen.brengt,
+    haalt: rollen.haalt,
+    school: school || undefined,
     leden,
     uiterlijk,
     boodschappen: [],
     datumGevonden: !!d.datum,
     bron,
+    rit,
+    door,
+    herhaling: week && soort === "afspraak" ? { soort: "wekelijks", interval: 1, dagen: week.dagen } : undefined,
   };
 }
 
@@ -264,8 +352,8 @@ export function leesTekst(tekst: string, opties: { vandaag: string; leden: Lid[]
 export function beschrijf(v: Voorstel, leden: Lid[], label: (datum: string) => string): string {
   if (v.soort === "boodschappen") return `${v.boodschappen.length} ${v.boodschappen.length === 1 ? "boodschap" : "boodschappen"} op de lijst`;
   const wie = v.leden.map((id) => leden.find((l) => l.id === id)?.naam).filter(Boolean).join(", ");
-  const wanneer = v.datumGevonden || v.soort === "afspraak" ? label(v.datum) : "";
+  const wanneer = v.herhaling ? `elke ${v.herhaling.dagen.map((d) => ["ma", "di", "wo", "do", "vr", "za", "zo"][d - 1]).join(", ")}` : v.datumGevonden || v.soort === "afspraak" ? label(v.datum) : "";
   const tijd = v.begin ? ` ${v.begin}${v.eind ? `–${v.eind}` : ""}` : "";
-  const soort = v.soort === "afspraak" ? "Afspraak" : v.uiterlijk ? "Taak met deadline" : "Taak";
+  const soort = v.rit ? `Rit (${v.rit === "halen" ? "halen" : v.rit === "brengen" ? "brengen" : "brengen en halen"})` : v.soort === "afspraak" ? "Afspraak" : v.uiterlijk ? "Taak met deadline" : "Taak";
   return [soort, wanneer ? `${v.uiterlijk ? "uiterlijk " : ""}${wanneer}${tijd}` : "", wie ? `voor ${wie}` : ""].filter(Boolean).join(" · ");
 }
